@@ -104,8 +104,8 @@
             <td>{{ record.model }}</td>
             <td>{{ record.length }}</td>
             <td>{{ record.tempo }}</td>
-            <td><a class="download" href="/download_music/{{ record.midi_filename }}">MIDI</a></td>
-            <td><a class="download" href="/download_music/{{ record.wav_filename }}">WAV</a></td>
+            <td><a class="download" href="{{ url_for('download_music', filename=record.midi_file.split('/')[-1]) }}">MIDI</a></td>
+            <td><a class="download" href="{{ url_for('download_music', filename=record.wav_file.split('/')[-1]) }}">WAV</a></td>
         </tr>
     </table>
     <div class="record-delete">

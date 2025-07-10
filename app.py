@@ -11,7 +11,7 @@ from note_seq import midi_io
 from note_seq.protobuf import music_pb2
 from note_seq.protobuf import generator_pb2
 
-# Import midi2audio
+import midi2audio
 from midi2audio import FluidSynth as Synth
 import re
 
@@ -338,11 +338,8 @@ def generate_music():
 
     # Původní hodnoty, které se případně přepíší z promptu
     current_params = {
-        "length": 30,
-        "tempo": 120,
-        "temperature": 1.0,
-        "model": "basic_rnn",
-        "instrument": 0 # Defaultní hlavní nástroj (piano)
+        "length": 30, "tempo": 120, "temperature": 1.0,
+        "model": "basic_rnn", "instrument": 0 # Defaultní hlavní nástroj (piano)
     }
     prompt = data.get("prompt", "")
     parsed_params = parse_prompt(prompt, current_params)
@@ -379,11 +376,7 @@ def generate_music():
 
     generator_options = generator_pb2.GeneratorOptions()
     generator_options.args["temperature"].float_value = temperature
-    generator_options.generate_sections.add(
-        start_time=input_sequence.total_time,
-        end_time=length
-    )
-
+    generator_options.generate_sections.add(start_time=input_sequence.total_time, end_time=length)
     note_sequence = melody_rnn.generate(input_sequence, generator_options)
 
     if chord_progression_type == "rock":
@@ -565,30 +558,46 @@ def generate_music():
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename_base = f"generated_{model}_{length}s_{tempo}bpm_{temperature}temp_inst{melody_instrument}_{timestamp}"
+
+    # Použijeme relativní cesty pro uložení
     midi_path = os.path.join(OUTPUT_DIR, filename_base + ".mid")
     wav_path = os.path.join(OUTPUT_DIR, filename_base + ".wav")
 
     midi_io.sequence_proto_to_midi_file(note_sequence, midi_path)
 
+    # --- ZAČÁTEK DŮLEŽITÉ OPRAVY ---
+    # Převedeme všechny cesty na absolutní, než je předáme externímu programu
+    abs_fluidsynth_path = os.path.abspath(fluidsynth_executable_path)
+    abs_soundfont_path = os.path.abspath(soundfont_path)
+    abs_midi_path = os.path.abspath(midi_path)
+    abs_wav_path = os.path.abspath(wav_path)
+
     # Převod MIDI na WAV pomocí subprocess a FluidSynth
     try:
         if not os.path.exists(soundfont_path):
-            return jsonify({"error": f"SoundFont soubor nebyl nalezen na: {soundfont_path}"}), 500
+            return jsonify({"error": f"SoundFont soubor nebyl nalezen na absolutní cestě: {abs_soundfont_path}"}), 500
+        if not os.path.exists(abs_midi_path):
+            return jsonify({"error": f"Vstupní MIDI soubor nebyl nalezen na absolutní cestě: {abs_midi_path}"}), 500
 
-        subprocess.run([
-            fluidsynth_executable_path,
+        result = subprocess.run([
+            abs_fluidsynth_path,  # Používáme absolutní cestu
             "-ni",
-            soundfont_path,
-            midi_path,
-            "-F", wav_path,
+            abs_soundfont_path,  # Používáme absolutní cestu
+            abs_midi_path,       # Používáme absolutní cestu
+            "-F", abs_wav_path,  # Používáme absolutní cestu
             "-r", "44100"
-        ], check=True)
+        ], check=True, capture_output=True, text=True, encoding='utf-8')
+
+        if not os.path.exists(abs_wav_path) or os.path.getsize(abs_wav_path) == 0:
+            error_message = f"Převod na WAV selhal (soubor je prázdný nebo nebyl vytvořen). Hláška z FluidSynth: {result.stderr}"
+            return jsonify({"error": error_message}), 500
 
     except subprocess.CalledProcessError as e:
-        return jsonify({"error": f"Chyba při převodu MIDI na WAV: {e}"}), 500
+        error_output = e.stderr or "FluidSynth neposkytl žádnou chybovou hlášku."
+        return jsonify({"error": f"Chyba při převodu MIDI na WAV (kód {e.returncode}): {error_output}"}), 500
     except FileNotFoundError:
-        return jsonify({"error": "FluidSynth nebyl nalezen. Zkontrolujte cestu k executable."}), 500
-
+        return jsonify({"error": "FluidSynth nebyl nalezen. Zkontrolujte cestu v proměnné 'fluidsynth_executable_path'."}), 500
+    # --- KONEC DŮLEŽITÉ OPRAVY ---
 
     history_record = {
         "timestamp": timestamp,
