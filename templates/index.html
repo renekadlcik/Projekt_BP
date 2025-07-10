@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generátor AI hudby</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding-top: 50px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 600px;
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        h1 { color: #007bff; font-weight: bold; }
+        .status-message { margin-top: 20px; padding: 15px; border-radius: 5px; text-align: center; }
+        .status-message.alert-info { background-color: #d1ecf1; color: #0c5460; border-color: #bee5eb; }
+        .status-message.alert-success { background-color: #d4edda; color: #155724; border-color: #c3e6cb; }
+        .status-message.alert-danger { background-color: #f8d7da; color: #721c24; border-color: #f5c6cb; }
+        #download-buttons-container { text-align: center; margin-top: 20px; display: none; }
+        #download-buttons-container .btn { margin: 5px; }
+        .history-button-container { position: absolute; top: 20px; right: 20px; }
+    </style>
+</head>
+<body>
+<div class="history-button-container">
+    <a href="/history" class="btn btn-secondary btn-sm">Historie skladeb</a>
+</div>
+
+<div class="container">
+    <h1 class="text-center mb-4">Generátor AI hudby</h1>
+
+    <form id="musicForm">
+        <div class="form-group">
+            <label for="prompt">Popis skladby:</label>
+            <textarea class="form-control" id="prompt" name="prompt" rows="3" placeholder="Např: 'Rychlá rocková skladba s bubny a elektrickou kytarou, tempo 140'"></textarea>
+            <small class="form-text text-muted mt-2">
+                Zadejte žánr, tempo, nástroje, délku, náladu atd. Můžete také specifikovat model: 'basic_rnn' nebo 'attention_rnn'.
+            </small>
+        </div>
+        <button type="submit" id="generateButton" class="btn btn-primary btn-block">Generovat hudbu</button>
+    </form>
+
+    <div id="statusMessage" class="status-message" style="display: none;"></div>
+    <div id="download-buttons-container"></div>
+</div>
+
+<script>
+    document.getElementById('musicForm').addEventListener('submit', function(event) {
+        event.preventDefault();
+
+        const prompt = document.getElementById('prompt').value;
+        if (!prompt.trim()) {
+            alert('Zadejte prosím popis skladby.');
+            return;
+        }
+
+        const statusMessage = document.getElementById('statusMessage');
+        const downloadButtonsContainer = document.getElementById('download-buttons-container');
+        const generateButton = document.getElementById('generateButton');
+
+        // --- Krok 1: UI do stavu "načítání" ---
+        statusMessage.innerText = '🎵 Generuji hudbu... Tento proces může chvíli trvat, prosím čekejte.';
+        statusMessage.className = 'status-message alert alert-info';
+        statusMessage.style.display = 'block';
+
+        downloadButtonsContainer.style.display = 'none';
+        downloadButtonsContainer.innerHTML = '';
+
+        generateButton.disabled = true;
+        generateButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Generuji...';
+
+        fetch('/generate_music', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ prompt: prompt })
+        })
+            .then(response => {
+                if (!response.ok) {
+                    return response.json().then(errorData => {
+                        throw new Error(errorData.error || `HTTP chyba ${response.status}`);
+                    }).catch(() => {
+                        throw new Error(`HTTP chyba ${response.status}`);
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                // Úspěšné generování - zobrazíme zprávu a tlačítka pro stažení
+                statusMessage.innerText = 'Hudba byla úspěšně vygenerována!';
+                statusMessage.className = 'status-message alert alert-success';
+
+                // Vytvoření tlačítek pro stažení
+                downloadButtonsContainer.innerHTML = `
+                    <a href="/download_music/${data.midi_file.split('/').pop()}" class="btn btn-primary">Stáhnout MIDI</a>
+                    <a href="/download_music/${data.wav_file.split('/').pop()}" class="btn btn-success">Stáhnout WAV</a>
+                `;
+                downloadButtonsContainer.style.display = 'block';
+            })
+            .catch(error => {
+                console.error('Došlo k chybě:', error);
+                statusMessage.innerText = 'Chyba: ' + error.message;
+                statusMessage.className = 'status-message alert alert-danger';
+            })
+            .finally(() => {
+                generateButton.disabled = false;
+                generateButton.innerHTML = 'Generovat hudbu';
+            });
+    });
+</script>
+</body>
+</html>
