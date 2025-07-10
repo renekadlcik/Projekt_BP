@@ -7,7 +7,9 @@
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body {
-            padding-top: 50px;
+            background: linear-gradient(to right, #f0f4f8, #e0ecf3);
+            font-family: 'Segoe UI', sans-serif;
+            padding-top: 250px;
             background-color: #f8f9fa;
         }
         .container {
@@ -25,6 +27,10 @@
         #download-buttons-container { text-align: center; margin-top: 20px; display: none; }
         #download-buttons-container .btn { margin: 5px; }
         .history-button-container { position: absolute; top: 20px; right: 20px; }
+
+        h1::before {
+            content: "🎼 "; }
+
     </style>
 </head>
 <body>
@@ -38,9 +44,9 @@
     <form id="musicForm">
         <div class="form-group">
             <label for="prompt">Popis skladby:</label>
-            <textarea class="form-control" id="prompt" name="prompt" rows="3" placeholder="Např: 'Rychlá rocková skladba s bubny a elektrickou kytarou, tempo 140'"></textarea>
+            <textarea class="form-control" id="prompt" name="prompt" rows="3"></textarea>
             <small class="form-text text-muted mt-2">
-                Zadejte žánr, tempo, nástroje, délku, náladu atd. Můžete také specifikovat model: 'basic_rnn' nebo 'attention_rnn'.
+                Zadejte žánr, tempo, nástroje, délku, náladu atd. Např: 'Rychlá rocková skladba s bubny a elektrickou kytarou, tempo 140...
             </small>
         </div>
         <button type="submit" id="generateButton" class="btn btn-primary btn-block">Generovat hudbu</button>

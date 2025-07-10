@@ -6,72 +6,106 @@
     <title>Historie generovaných skladeb</title>
     <style>
         body {
+            background: linear-gradient(to right, #f0f4f8, #e0ecf3);
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: #121212;
-            color: #e0e0e0;
             margin: 0;
-            padding: 20px;
+            padding: 40px 20px;
+            color: #333;
         }
+
         h1 {
             text-align: center;
-            color: #ffffff;
+            color: #007bff;
+            margin-bottom: 40px;
         }
+
         table {
-            width: 85%;
-            table-layout: fixed;
+            width: 95%;
+            margin: 0 auto 40px auto;
             border-collapse: collapse;
-            margin-top: 10px;
+            background-color: #fff;
+            border-radius: 8px;
+            overflow: hidden;
         }
+
         th, td {
-            border: 1px solid #333;
-            padding: 10px;
+            border: 2px solid #444;
+            padding: 12px;
             text-align: center;
         }
-        th {
-            background-color: #1f1f1f;
+
+        thead th {
+            background-color: #ffffff;
+            color: #333;
+            font-weight: bold;
         }
-        tr:nth-child(even) {
-            background-color: #2a2a2a;
+
+        tr:nth-child(even) td {
+            background-color: #f9fcff;
         }
+
+        /* === NOVÝ STYL PRO BUŇKU S TLAČÍTKEM === */
+        .action-cell {
+            background: #e0ecf3; /* Průhledné pozadí, převezme barvu stránky */
+            border: none;          /* Bez ohraničení */
+        }
+        /* Aplikujeme i na pruhované řádky, aby se přebil původní styl */
+        tr:nth-child(even) .action-cell {
+            background: #e0ecf3;
+        }
+        /* ========================================= */
+
         a.download {
             color: #28a745;
+            font-weight: bold;
             text-decoration: none;
         }
+
         a.download:hover {
             text-decoration: underline;
         }
-        .back-link {
-            display: inline-block;
-            margin-top: 20px;
-            color: #007bff;
-            text-decoration: none;
-        }
-        .back-link:hover {
-            text-decoration: underline;
-        }
+
         .btn-danger {
             background-color: #dc3545;
             color: white;
-            padding: 10px 18px;
-            font-size: 16px;
+            padding: 6px 12px;
+            font-size: 0.9rem;
             border: none;
             border-radius: 5px;
             cursor: pointer;
-            transition: background-color 0.2s ease;
         }
+
         .btn-danger:hover {
             background-color: #c82333;
         }
-        .record-row {
-            display: flex;
-            align-items: center;
-            margin-bottom: 20px;
+
+        .btn-clear {
+            display: block;
+            margin: 0 auto 20px auto;
+            background-color: #6c757d;
+            color: white;
+            padding: 10px 20px;
+            font-size: 1rem;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
         }
-        .record-row table {
-            margin: 0;
+
+        .btn-clear:hover {
+            background-color: #5a6268;
         }
-        .record-delete {
-            margin-left: 15px;
+
+        .back-link {
+            display: block;
+            text-align: center;
+            font-size: 1rem;
+            color: #007bff;
+            text-decoration: none;
+            margin-top: 10px;
+        }
+
+        .back-link:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
@@ -79,7 +113,6 @@
 <h1>Historie generovaných skladeb</h1>
 
 {% if records %}
-<!-- Hlavička tabulky -->
 <table>
     <thead>
     <tr>
@@ -90,34 +123,30 @@
         <th>Tempo</th>
         <th>MIDI</th>
         <th>WAV</th>
+        <th class="action-cell"></th>
     </tr>
     </thead>
+    <tbody>
+    {% for record in records|reverse %}
+    <tr>
+        <td>{{ record.timestamp }}</td>
+        <td>{{ record.Genre if record.Genre else "-" }}</td>
+        <td>{{ record.model }}</td>
+        <td>{{ record.length }}</td>
+        <td>{{ record.tempo }}</td>
+        <td><a class="download" href="{{ url_for('download_music', filename=record.midi_file.split('/')[-1]) }}">MIDI</a></td>
+        <td><a class="download" href="{{ url_for('download_music', filename=record.wav_file.split('/')[-1]) }}">WAV</a></td>
+        <td class="action-cell">
+            <button class="btn-danger" onclick="deleteRecord('{{ record.timestamp }}')">Smazat</button>
+        </td>
+    </tr>
+    {% endfor %}
+    </tbody>
 </table>
 
-<!-- Výpis záznamů -->
-{% for record in records|reverse %}
-<div class="record-row">
-    <table>
-        <tr>
-            <td>{{ record.timestamp }}</td>
-            <td>{{ record.Genre if record.Genre else "-" }}</td>
-            <td>{{ record.model }}</td>
-            <td>{{ record.length }}</td>
-            <td>{{ record.tempo }}</td>
-            <td><a class="download" href="{{ url_for('download_music', filename=record.midi_file.split('/')[-1]) }}">MIDI</a></td>
-            <td><a class="download" href="{{ url_for('download_music', filename=record.wav_file.split('/')[-1]) }}">WAV</a></td>
-        </tr>
-    </table>
-    <div class="record-delete">
-        <button class="btn btn-danger" onclick="deleteRecord('{{ record.timestamp }}')">Smazat</button>
-    </div>
-</div>
-{% endfor %}
-
-<!-- Tlačítko pro smazání celé historie -->
-<button class="btn btn-danger" onclick="clearHistory()">Smazat celou historii</button>
+<button class="btn-clear" onclick="clearHistory()">🗑️ Smazat celou historii</button>
 {% else %}
-<p>Žádné skladby zatím nebyly vygenerovány.</p>
+<p style="text-align: center;">Žádné skladby zatím nebyly vygenerovány.</p>
 {% endif %}
 
 <a class="back-link" href="/">← Zpět na generátor</a>
