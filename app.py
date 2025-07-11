@@ -181,6 +181,7 @@ def clear_history():
 
 def parse_prompt(prompt, current_params):
     prompt_lower = prompt.lower()
+    detected_Genre = None
 
     parsed_params = {
         "length": current_params.get("length", 30),
@@ -209,8 +210,10 @@ def parse_prompt(prompt, current_params):
         parsed_params["tempo"] = int(tempo_match.group(1))
     else:
         for keyword, config in GENRE_MAP.items():
-            if keyword in prompt_lower and "tempo_range" in config:
-                parsed_params["tempo"] = (config["tempo_range"][0] + config["tempo_range"][1]) // 2
+            if keyword in prompt_lower:
+                if "tempo_range" in config:
+                    parsed_params["tempo"] = (config["tempo_range"][0] + config["tempo_range"][1]) // 2
+                    detected_Genre = keyword
                 break
         if "fast" in prompt_lower:
             parsed_params["tempo"] = 160
@@ -321,6 +324,8 @@ def parse_prompt(prompt, current_params):
                     parsed_params["add_drums"] = False
 
     parsed_params["temperature"] = max(0.1, min(2.0, parsed_params["temperature"]))
+
+    parsed_params["genre"] = detected_Genre
 
     return parsed_params
 
@@ -613,6 +618,7 @@ def generate_music():
         "length": length,
         "tempo": tempo,
         "temperature": temperature,
+        "genre": parsed_params.get("genre") or "-",
         "melody_instrument": melody_instrument,
         "bass_instrument": bass_instrument,
         "chord_instrument": chord_instrument,
