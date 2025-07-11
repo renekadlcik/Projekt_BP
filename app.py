@@ -326,14 +326,35 @@ def parse_prompt(prompt, current_params):
     parsed_params["temperature"] = max(0.1, min(2.0, parsed_params["temperature"]))
 
 # --- Nové rozpoznání stylu akordů ---
-    if "seventh chord" in prompt_lower or "maj7" in prompt_lower or "four-note chord" in prompt_lower:
+    # --- rozpoznání stylu akordů (rozšířené) ---
+    if any(w in prompt_lower for w in [
+        "seventh chord", "7th chord", "maj7", "major 7", "minor 7", "min7"
+    ]):
         parsed_params["chord_style"] = "seventh"
-    elif "sus chord" in prompt_lower or "suspended" in prompt_lower:
+
+    elif any(w in prompt_lower for w in [
+        "sus chord", "suspended", "sus4", "sus2"
+    ]):
         parsed_params["chord_style"] = "sus"
-    elif "transition chord" in prompt_lower or "chromatic" in prompt_lower or "intermediate chord" in prompt_lower:
+
+    elif any(w in prompt_lower for w in [
+        "diminished", "dim chord", "dim7", "o7"
+    ]):
+        parsed_params["chord_style"] = "diminished"
+
+    elif any(w in prompt_lower for w in [
+        "augmented", "aug chord", "aug7", "+7"
+    ]):
+        parsed_params["chord_style"] = "augmented"
+
+    elif any(w in prompt_lower for w in [
+        "transition chord", "chromatic", "intermediate chord"
+    ]):
         parsed_params["chord_style"] = "transition"
+
     else:
         parsed_params["chord_style"] = "standard"
+
 
     parsed_params["genre"] = detected_Genre
 
@@ -416,10 +437,10 @@ def generate_music():
     ]
     elif chord_style == "sus":
         chord_progression = [
-            [60, 65, 67],       # Csus4
-            [57, 62, 64],       # Asus4
-            [55, 60, 62],       # Gsus4
-            [53, 58, 60]        # Fsus4
+        [60, 65, 67],       # Csus4
+        [57, 62, 64],       # Asus4
+        [55, 60, 62],       # Gsus4
+        [53, 58, 60]        # Fsus4
     ]
     elif chord_style == "transition":
         chord_progression = [
@@ -427,6 +448,20 @@ def generate_music():
         [62, 65, 69],
         [59, 63, 66],
         [60, 64, 67]
+    ]
+    elif chord_style == "diminished":
+        chord_progression = [
+        [60, 63, 66],       # Cdim
+        [62, 65, 68],       # Ddim
+        [59, 62, 65],       # Bdim
+        [57, 60, 63]        # A#dim
+    ]
+    elif chord_style == "augmented":
+        chord_progression = [
+        [60, 64, 68],       # Caug
+        [62, 66, 70],       # Daug
+        [59, 63, 67],       # Baug
+        [55, 59, 63]        # G#aug
     ]
     else:
         chord_progression = None
