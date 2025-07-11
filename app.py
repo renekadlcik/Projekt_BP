@@ -162,6 +162,14 @@ def delete_record(timestamp):
     except Exception as e:
         return jsonify({"error": f"Chyba při ukládání historie po smazání: {str(e)}"}), 500
 
+@app.template_filter("datetimeformat")
+def datetimeformat(value, input_fmt="%Y%m%d_%H%M%S", output_fmt="%d.%m.%Y %H:%M:%S"):
+    try:
+        dt = datetime.strptime(value, input_fmt)
+        return dt.strftime(output_fmt)
+    except ValueError:
+        return value
+
 @app.route("/clear_history", methods=["POST"])
 def clear_history():
     try:

@@ -129,7 +129,7 @@
     <tbody>
     {% for record in records|reverse %}
     <tr>
-        <td>{{ record.timestamp }}</td>
+        <td>{{ record.timestamp | datetimeformat }}</td>
         <td>{{ record.Genre if record.Genre else "-" }}</td>
         <td>{{ record.model }}</td>
         <td>{{ record.length }}</td>
