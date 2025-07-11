@@ -325,7 +325,19 @@ def parse_prompt(prompt, current_params):
 
     parsed_params["temperature"] = max(0.1, min(2.0, parsed_params["temperature"]))
 
+# --- Nové rozpoznání stylu akordů ---
+    if "seventh chord" in prompt_lower or "maj7" in prompt_lower or "four-note chord" in prompt_lower:
+        parsed_params["chord_style"] = "seventh"
+    elif "sus chord" in prompt_lower or "suspended" in prompt_lower:
+        parsed_params["chord_style"] = "sus"
+    elif "transition chord" in prompt_lower or "chromatic" in prompt_lower or "intermediate chord" in prompt_lower:
+        parsed_params["chord_style"] = "transition"
+    else:
+        parsed_params["chord_style"] = "standard"
+
     parsed_params["genre"] = detected_Genre
+
+    parsed_params["prompt_lower"] = prompt_lower
 
     return parsed_params
 
@@ -356,6 +368,7 @@ def generate_music():
     }
     prompt = data.get("prompt", "")
     parsed_params = parse_prompt(prompt, current_params)
+    prompt_lower = parsed_params.get("prompt_lower", "")
 
     length = parsed_params["length"]
     tempo = parsed_params["tempo"]
@@ -391,6 +404,32 @@ def generate_music():
     generator_options.args["temperature"].float_value = temperature
     generator_options.generate_sections.add(start_time=input_sequence.total_time, end_time=length)
     note_sequence = melody_rnn.generate(input_sequence, generator_options)
+# Nové styly akordů podle typu
+    chord_style = parsed_params.get("chord_style", "standard")
+
+    if chord_style == "seventh":
+        chord_progression = [
+        [60, 64, 67, 70],   # Cmaj7
+        [55, 59, 62, 65],   # Gmaj7
+        [57, 60, 64, 67],   # A-7
+        [53, 57, 60, 64]    # Fmaj7
+    ]
+    elif chord_style == "sus":
+        chord_progression = [
+            [60, 65, 67],       # Csus4
+            [57, 62, 64],       # Asus4
+            [55, 60, 62],       # Gsus4
+            [53, 58, 60]        # Fsus4
+    ]
+    elif chord_style == "transition":
+        chord_progression = [
+        [60, 64, 67],
+        [62, 65, 69],
+        [59, 63, 66],
+        [60, 64, 67]
+    ]
+    else:
+        chord_progression = None
 
     if chord_progression_type == "rock":
         chord_progression = [
@@ -538,30 +577,55 @@ def generate_music():
                 break
 
     if add_arpeggio:
+        prompt_style = "up"  # výchozí
+
+        if "down arpeggio" in prompt_lower:
+            prompt_style = "down"
+        elif "up-down arpeggio" in prompt_lower or "up down arpeggio" in prompt_lower:
+            prompt_style = "up_down"
+        elif "random arpeggio" in prompt_lower:
+            prompt_style = "random"
+
+    # Pak pokračuje funkce make_pattern a použití arpeggia
+
+
         arpeggio_instrument = melody_instrument if melody_instrument != 0 else 80
-        arpeggio_velocity = 85
-        arpeggio_duration_per_note = 0.25
+        arpeggio_velocity   = 85
+        note_dur            = 0.25  # délka jedné noty
+
+        def make_pattern(ch):
+            if prompt_style == "up":
+                return ch
+            if prompt_style == "down":
+                return list(reversed(ch))
+            if prompt_style == "up_down":
+                return ch + list(reversed(ch[:-1]))
+            if prompt_style == "random":
+                import random, copy
+                pat = copy.copy(ch)
+                random.shuffle(pat)
+                return pat
+            return ch
 
         for rep in range(num_repetitions):
             for i, chord in enumerate(chord_progression):
-                base_time = (rep * total_chord_beats) + (i * measure_duration)
-                if base_time >= length:
+                base = (rep * total_chord_beats) + (i * measure_duration)
+                if base >= length:
                     break
-
-                arpeggio_pitches = [chord[0], chord[1], chord[2], chord[0] + 12, chord[2], chord[1]]
-
-                for j, pitch in enumerate(arpeggio_pitches):
-                    note_start_time = base_time + (j * arpeggio_duration_per_note)
-                    if note_start_time < base_time + measure_duration:
-                        arpeggio_note = note_sequence.notes.add()
-                        arpeggio_note.pitch = pitch
-                        arpeggio_note.start_time = note_start_time
-                        arpeggio_note.end_time = arpeggio_note.start_time + arpeggio_duration_per_note * 0.8
-                        arpeggio_note.velocity = arpeggio_velocity
-                        arpeggio_note.instrument = 4
-                        arpeggio_note.program = arpeggio_instrument
-                        arpeggio_note.is_drum = False
-            if base_time >= length:
+                pattern = make_pattern(chord)
+                for j, pitch in enumerate(pattern):
+                    t_start = base + j * note_dur
+                    if t_start >= base + measure_duration or t_start >= length:
+                        break
+                    n = note_sequence.notes.add()
+                    n.pitch       = pitch
+                    n.start_time  = t_start
+                    n.end_time    = t_start + note_dur * 0.8
+                    n.velocity    = arpeggio_velocity
+                    n.instrument  = 4
+                    n.program     = arpeggio_instrument
+                    n.is_drum     = False
+            if base >= length:
                 break
 
     for note in note_sequence.notes:
