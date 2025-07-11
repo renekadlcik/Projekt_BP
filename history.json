@@ -1,6 +1,42 @@
 [
     {
-        "timestamp": "20250711_121420",
+        "timestamp": "20250711_123426",
+        "model": "basic_rnn",
+        "length": 60,
+        "tempo": 120,
+        "temperature": 1.0,
+        "melody_instrument": 40,
+        "bass_instrument": 33,
+        "chord_instrument": 29,
+        "pad_instrument": null,
+        "add_drums": true,
+        "chord_progression_type": "standard",
+        "major_key": true,
+        "add_arpeggio": false,
+        "prompt": "violin, 60s",
+        "midi_file": "/download_music/generated_basic_rnn_60s_120bpm_1.0temp_inst40_20250711_123426.mid",
+        "wav_file": "/download_music/generated_basic_rnn_60s_120bpm_1.0temp_inst40_20250711_123426.wav"
+    },
+    {
+        "timestamp": "20250711_123345",
+        "model": "basic_rnn",
+        "length": 30,
+        "tempo": 150,
+        "temperature": 1.0,
+        "melody_instrument": 29,
+        "bass_instrument": 34,
+        "chord_instrument": 30,
+        "pad_instrument": null,
+        "add_drums": true,
+        "chord_progression_type": "rock",
+        "major_key": true,
+        "add_arpeggio": false,
+        "prompt": "rock\n",
+        "midi_file": "/download_music/generated_basic_rnn_30s_150bpm_1.0temp_inst29_20250711_123345.mid",
+        "wav_file": "/download_music/generated_basic_rnn_30s_150bpm_1.0temp_inst29_20250711_123345.wav"
+    },
+    {
+        "timestamp": "20250711_123307",
         "model": "basic_rnn",
         "length": 30,
         "tempo": 150,
@@ -14,8 +50,8 @@
         "major_key": true,
         "add_arpeggio": false,
         "prompt": "rock",
-        "midi_file": "/download_music/generated_basic_rnn_30s_150bpm_1.0temp_inst29_20250711_121420.mid",
-        "wav_file": "/download_music/generated_basic_rnn_30s_150bpm_1.0temp_inst29_20250711_121420.wav"
+        "midi_file": "/download_music/generated_basic_rnn_30s_150bpm_1.0temp_inst29_20250711_123307.mid",
+        "wav_file": "/download_music/generated_basic_rnn_30s_150bpm_1.0temp_inst29_20250711_123307.wav"
     },
     {
         "timestamp": "20250711_120908",

@@ -107,9 +107,15 @@
 
                 // Vytvoření tlačítek pro stažení
                 downloadButtonsContainer.innerHTML = `
-                    <a href="/download_music/${data.midi_file.split('/').pop()}" class="btn btn-primary">Stáhnout MIDI</a>
-                    <a href="/download_music/${data.wav_file.split('/').pop()}" class="btn btn-success">Stáhnout WAV</a>
-                `;
+                <a href="/download_music/${data.midi_file.split('/').pop()}" class="btn btn-primary">Stáhnout MIDI</a>
+                <a href="/download_music/${data.wav_file.split('/').pop()}" class="btn btn-success">Stáhnout WAV</a>
+                <br>
+                <audio controls style="margin-top: 15px; width: 100%;">
+                    <source src="${data.wav_file}" type="audio/wav">
+                    Váš prohlížeč nepodporuje přehrávání audia.
+                </audio>
+`;
+
                 downloadButtonsContainer.style.display = 'block';
             })
             .catch(error => {
