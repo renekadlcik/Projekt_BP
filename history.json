@@ -1,25 +1,6 @@
 [
     {
-        "timestamp": "20250711_132449",
-        "model": "basic_rnn",
-        "length": 30,
-        "tempo": 160,
-        "temperature": 1.0,
-        "genre": "rock",
-        "melody_instrument": 40,
-        "bass_instrument": 34,
-        "chord_instrument": 30,
-        "pad_instrument": null,
-        "add_drums": true,
-        "chord_progression_type": "rock",
-        "major_key": true,
-        "add_arpeggio": false,
-        "prompt": "violin, fast, rock",
-        "midi_file": "/download_music/generated_basic_rnn_30s_160bpm_1.0temp_inst40_20250711_132449.mid",
-        "wav_file": "/download_music/generated_basic_rnn_30s_160bpm_1.0temp_inst40_20250711_132449.wav"
-    },
-    {
-        "timestamp": "20250711_132409",
+        "timestamp": "20250711_145024",
         "model": "basic_rnn",
         "length": 30,
         "tempo": 150,
@@ -34,7 +15,7 @@
         "major_key": true,
         "add_arpeggio": false,
         "prompt": "rock",
-        "midi_file": "/download_music/generated_basic_rnn_30s_150bpm_1.0temp_inst29_20250711_132409.mid",
-        "wav_file": "/download_music/generated_basic_rnn_30s_150bpm_1.0temp_inst29_20250711_132409.wav"
+        "midi_file": "/download_music/generated_basic_rnn_30s_150bpm_1.0temp_inst29_20250711_145024.mid",
+        "wav_file": "/download_music/generated_basic_rnn_30s_150bpm_1.0temp_inst29_20250711_145024.wav"
     }
 ]

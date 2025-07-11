@@ -28,7 +28,7 @@ BUNDLE_PATHS = {
 }
 
 # Upravit cestu k SoundFontu - ZKONTROLUJTE TUTO CESTU!
-soundfont_path = r"C:\Users\renek\Downloads\GeneralUser_GS_v2.0.2--doc_r4\GeneralUser-GS\GeneralUser-GS.sf2"
+soundfont_path = r"C:\Users\renek\Downloads\Timbres Of Heaven GM_GS_XG_SFX V 3.4 Final\Timbres Of Heaven GM_GS_XG_SFX V 3.4 Final.sf2"
 fluidsynth_executable_path = r"C:\Users\renek\Downloads\fluidsynth-2.3.3-win10-x64\bin\fluidsynth.exe"
 
 INSTRUMENT_MIDI_MAP = {
