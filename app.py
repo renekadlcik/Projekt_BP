@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import subprocess
 from datetime import datetime
@@ -117,6 +119,47 @@ GENRE_MAP = {
     "arpeggio": {"add_arpeggio": True},
     "solo": {"solo_mode": True},
 }
+# --- nový blok -----------------------------------------------------------
+def prepare_layers_for_genre(genre_key: str,
+                             melody_instrument: int | None = None,
+                             pad_instrument: int | None = None):
+    """
+    Vrátí slovník s instrumenty rozdělenými do vrstev
+    podle přednastaveného žánru (GENRE_MAP).
+
+    • Pokud předáš vlastní číslo nástroje (melody_instrument / pad_instrument),
+      přepíše výchozí hodnotu v dané vrstvě.
+    • Funkce vždy vrátí klíče "melody", "pad", "bass", "chords", "drums".
+      Neexistující vrstvu označí hodnotou None, aby se s ní dalo snadno pracovat.
+    """
+    # fallback pro žánry, které v mapě nejsou
+    base = {
+        "melody": 0,      # piano
+        "pad": None,
+        "bass": 33,       # fingered bass
+        "chords": 0,
+        "drums": 128
+    }
+
+    preset = GENRE_MAP.get(genre_key.lower())
+    if preset:
+        base.update({
+            "melody": preset.get("melody_instrument", base["melody"]),
+            "pad":    preset.get("pad_instrument",    base["pad"]),
+            "bass":   preset.get("bass_instrument",   base["bass"]),
+            "chords": preset.get("chord_instrument",  base["chords"]),
+            "drums":  128 if preset.get("drums_preset", "none") != "none" else None
+        })
+
+    # uživatelská přepisování
+    if melody_instrument is not None:
+        base["melody"] = melody_instrument
+    if pad_instrument is not None:
+        base["pad"] = pad_instrument
+
+    return base
+# --- konec nového bloku ---------------------------------------------------
+
 
 def save_history(record):
     history = []
@@ -395,11 +438,16 @@ def generate_music():
     tempo = parsed_params["tempo"]
     temperature = parsed_params["temperature"]
     model = parsed_params["model"]
-    melody_instrument = parsed_params["melody_instrument"]
-    bass_instrument = parsed_params["bass_instrument"]
-    chord_instrument = parsed_params["chord_instrument"]
-    pad_instrument = parsed_params["pad_instrument"]
-    add_drums = parsed_params["add_drums"]
+    layers = prepare_layers_for_genre(parsed_params.get("genre") or "pop",
+                                      melody_instrument=parsed_params["melody_instrument"],
+                                      pad_instrument=parsed_params["pad_instrument"])
+
+    melody_instrument = layers["melody"]
+    bass_instrument   = layers["bass"]
+    chord_instrument  = layers["chords"]
+    pad_instrument    = layers["pad"]
+    add_drums         = layers["drums"] is not None
+
     chord_progression_type = parsed_params["chord_progression_type"]
     major_key = parsed_params["major_key"]
     add_arpeggio = parsed_params["add_arpeggio"]
