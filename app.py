@@ -281,6 +281,9 @@ def parse_prompt(prompt, current_params):
             parsed_params["temperature"] = max(parsed_params["temperature"], 1.2)
         elif "simple" in prompt_lower or "calm" in prompt_lower:
             parsed_params["temperature"] = min(parsed_params["temperature"], 0.8)
+            # Speciálně pro rock chceme spíše umírněnější (méně chaotické) tóny
+        if "rock" in prompt_lower:
+            parsed_params["temperature"] = min(parsed_params["temperature"], 0.85)
 
     melody_instrument_found_in_prompt = False
     # Check for specific_instrument by MIDI number first
@@ -419,8 +422,29 @@ def history():
         record['pad_instrument_name'] = REVERSE_INSTRUMENT_MIDI_MAP.get(record.get('pad_instrument'), "None")
     return render_template("history.html", records=records)
 
+def get_section_type(i):
+    types = ["verse", "chorus", "bridge", "outro"]
+    return types[i % len(types)]
+
+def apply_tempo_curve(note_sequence, section_types, base_tempo=120):
+    section_length = 8  # sekund
+
+    for i, section in enumerate(section_types):
+        tempo_change = base_tempo
+    if section == "verse":
+        tempo_change = base_tempo
+    elif section == "chorus":
+        tempo_change = int(base_tempo * 1.1)
+    elif section == "bridge":
+        tempo_change = int(base_tempo * 0.9)
+    elif section == "outro":
+        tempo_change = int(base_tempo * 0.8)
+
+    note_sequence.tempos.add().qpm = tempo_change
+    note_sequence.tempos[-1].time = i * section_length
+
 @app.route("/generate_music", methods=["POST"])
-def generate_music():
+def generate_music(section_types=None):
     data = request.json
     if not data:
         return jsonify({"error": "Nebyla poskytnuta žádná data."}), 400
@@ -467,12 +491,21 @@ def generate_music():
     input_sequence = music_pb2.NoteSequence()
     input_sequence.notes.add(pitch=60, start_time=0.0, end_time=0.5, velocity=80)
     input_sequence.total_time = 0.5
+    # První tempo (počáteční hodnota), detailnější křivku aplikujeme až později
     input_sequence.tempos.add(qpm=tempo)
 
     generator_options = generator_pb2.GeneratorOptions()
     generator_options.args["temperature"].float_value = temperature
     generator_options.generate_sections.add(start_time=input_sequence.total_time, end_time=length)
     note_sequence = melody_rnn.generate(input_sequence, generator_options)
+    # Výpočet sekcí a jejich typů před aplikací tempa
+    section_duration = 8  # délka sekce v sekundách (můžeš upravit)
+    sections = int(length // section_duration) + 1
+    section_types = [get_section_type(i) for i in range(sections)]
+
+# Aplikace tempo křivky
+    apply_tempo_curve(note_sequence, section_types, base_tempo=tempo)
+
 # Nové styly akordů podle typu
     chord_style = parsed_params.get("chord_style", "standard")
 
@@ -711,10 +744,20 @@ def generate_music():
             if base >= length:
                 break
 
+# --- úsek po veškerém přidávání not, těsně před uložením do MIDI ---
+    MIN_NOTE_DURATION = 0.5   # minimální délka tónu (s) – klidně si uprav
+
     for note in note_sequence.notes:
-        if not note.is_drum and note.instrument not in [1, 2, 3, 4, 9]:
+        if not note.is_drum:
+            duration = note.end_time - note.start_time
+        if duration < MIN_NOTE_DURATION:
+            note.end_time = note.start_time + MIN_NOTE_DURATION
+
+        # b) sjednoť nástroj melodické vrstvy (nástroje 1-4 a 9 už necháváme)
+        if note.instrument not in [1, 2, 3, 4, 9]:
             note.instrument = 0
             note.program = melody_instrument
+
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename_base = f"generated_{model}_{length}s_{tempo}bpm_{temperature}temp_inst{melody_instrument}_{timestamp}"
