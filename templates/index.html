@@ -7,10 +7,10 @@
     <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body {
-            background: linear-gradient(to right, #f0f4f8, #e0ecf3);
-            font-family: 'Segoe UI', sans-serif;
-            padding-top: 250px;
-            background-color: #f8f9fa;
+            background:linear-gradient(to right,#0f2027,#203a43,#2c5364);
+            color:#e0f7fa;
+            font-family:'Segoe UI',sans-serif;
+            padding-top:250px;
         }
         .container {
             max-width: 600px;
@@ -31,6 +31,11 @@
         h1::before {
             content: "🎼 "; }
 
+        .prompt-label {
+            color: #333333;
+            font-weight: 500;
+        }
+
     </style>
 </head>
 <body>
@@ -43,7 +48,7 @@
 
     <form id="musicForm">
         <div class="form-group">
-            <label for="prompt">Zadejte popis skladby:</label>
+            <label for="prompt" class="prompt-label">Zadejte popis skladby:</label>
             <textarea class="form-control" id="prompt" name="prompt" rows="3"></textarea>
             <small class="form-text text-muted mt-2">
                 Zadejte žánr, tempo, nástroje, délku, náladu atd. Např: 'Rychlá rocková skladba s bubny a elektrickou kytarou, tempo 140...

@@ -6,11 +6,20 @@
     <title>Historie generovaných skladeb</title>
     <style>
         body {
-            background: linear-gradient(to right, #f0f4f8, #e0ecf3);
+            background: linear-gradient(to right, #0f2027, #203a43, #2c5364);
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             margin: 0;
             padding: 40px 20px;
             color: #333;
+        }
+
+        .container {
+            max-width: 1100px;
+            background-color: #ffffff;
+            padding: 30px;
+            border-radius: 8px;
+            margin: 0 auto;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
         }
 
         h1 {
@@ -22,9 +31,10 @@
         table {
             width: 95%;
             margin: 0 auto 40px auto;
-            border-collapse: collapse;
-            background-color: #fff;
-            border-radius: 8px;
+            border-collapse: separate;
+            border-spacing: 0;
+            background-color: transparent;
+            border-radius: 12px; /* ✅ Kulaté rohy */
             overflow: hidden;
         }
 
@@ -40,20 +50,17 @@
             font-weight: bold;
         }
 
-        tr:nth-child(even) td {
-            background-color: #f9fcff;
+        tr td {
+            background-color: #ffffff;
         }
 
-        /* === NOVÝ STYL PRO BUŇKU S TLAČÍTKEM === */
         .action-cell {
-            background: #e0ecf3; /* Průhledné pozadí, převezme barvu stránky */
-            border: none;          /* Bez ohraničení */
+            background: transparent;
+            border: none;
         }
-        /* Aplikujeme i na pruhované řádky, aby se přebil původní styl */
         tr:nth-child(even) .action-cell {
-            background: #e0ecf3;
+            background: transparent;
         }
-        /* ========================================= */
 
         a.download {
             color: #28a745;
@@ -107,13 +114,29 @@
         .back-link:hover {
             text-decoration: underline;
         }
+        thead th:first-child {
+            border-top-left-radius: 12px;
+        }
+
+        thead th:last-child {
+            border-top-right-radius: 12px;
+        }
+
+        tbody tr:last-child td:first-child {
+            border-bottom-left-radius: 12px;
+        }
+
+        tbody tr:last-child td:last-child {
+            border-bottom-right-radius: 12px;
+        }
+
     </style>
 </head>
 <body>
 <h1>Historie generovaných skladeb</h1>
 
 <div style="text-align: center; margin-bottom: 20px;">
-    <label for="genreFilter"><strong>Filtrovat podle žánru:</strong></label>
+    <label for="genreFilter" style="color: white;"><strong>Filtrovat podle žánru:</strong></label>
     <select id="genreFilter" onchange="filterByGenre()">
         <option value="">Všechny žánry</option>
         <option value="rock">Rock</option>
@@ -141,8 +164,7 @@
     <tbody>
     {% for record in records %}
     <tr data-genre="{{ record.genre }}">
-
-    <td>{{ record.timestamp | datetimeformat }}</td>
+        <td>{{ record.timestamp | datetimeformat }}</td>
         <td>{{ record.genre if record.genre else "-" }}</td>
         <td>{{ record.model }}</td>
         <td>{{ record.length }}</td>
@@ -169,16 +191,12 @@
         if (confirm('Opravdu chcete smazat tento záznam?')) {
             fetch(`/delete_record/${timestamp}`, {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
+                headers: { 'Content-Type': 'application/json' }
             })
                 .then(response => response.json())
                 .then(data => {
                     alert(data.message);
-                    if (!data.error) {
-                        location.reload();
-                    }
+                    if (!data.error) location.reload();
                 })
                 .catch(error => {
                     console.error('Chyba při mazání záznamu:', error);
@@ -191,16 +209,12 @@
         if (confirm('Opravdu chcete smazat CELOU historii? Toto nelze vrátit!')) {
             fetch('/clear_history', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                }
+                headers: { 'Content-Type': 'application/json' }
             })
                 .then(response => response.json())
                 .then(data => {
                     alert(data.message);
-                    if (!data.error) {
-                        location.reload();
-                    }
+                    if (!data.error) location.reload();
                 })
                 .catch(error => {
                     console.error('Chyba při mazání celé historie:', error);
@@ -215,14 +229,9 @@
 
         rows.forEach(row => {
             const rowGenre = row.getAttribute("data-genre")?.toLowerCase();
-            if (!selectedGenre || selectedGenre === rowGenre) {
-                row.style.display = "";
-            } else {
-                row.style.display = "none";
-            }
+            row.style.display = (!selectedGenre || selectedGenre === rowGenre) ? "" : "none";
         });
     }
-
 </script>
 </body>
 </html>

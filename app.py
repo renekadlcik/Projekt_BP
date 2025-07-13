@@ -371,7 +371,7 @@ def parse_prompt(prompt, current_params):
 
     parsed_params["temperature"] = max(0.1, min(2.0, parsed_params["temperature"]))
 
-# --- Nové rozpoznání stylu akordů ---
+    # --- Nové rozpoznání stylu akordů ---
     # --- rozpoznání stylu akordů (rozšířené) ---
     if any(w in prompt_lower for w in [
         "seventh chord", "7th chord", "maj7", "major 7", "minor 7", "min7"
@@ -467,6 +467,10 @@ def generate_music(section_types=None):
                                       pad_instrument=parsed_params["pad_instrument"])
 
     melody_instrument = layers["melody"]
+    # Pokud je žánr rock, nechceme melodii (vypneme ji nastavením na None)
+    if parsed_params.get("genre") == "rock":
+        melody_instrument = None
+
     bass_instrument   = layers["bass"]
     chord_instrument  = layers["chords"]
     pad_instrument    = layers["pad"]
@@ -503,47 +507,47 @@ def generate_music(section_types=None):
     sections = int(length // section_duration) + 1
     section_types = [get_section_type(i) for i in range(sections)]
 
-# Aplikace tempo křivky
+    # Aplikace tempo křivky
     apply_tempo_curve(note_sequence, section_types, base_tempo=tempo)
 
-# Nové styly akordů podle typu
+    # Nové styly akordů podle typu
     chord_style = parsed_params.get("chord_style", "standard")
 
     if chord_style == "seventh":
         chord_progression = [
-        [60, 64, 67, 70],   # Cmaj7
-        [55, 59, 62, 65],   # Gmaj7
-        [57, 60, 64, 67],   # A-7
-        [53, 57, 60, 64]    # Fmaj7
-    ]
+            [60, 64, 67, 70],   # Cmaj7
+            [55, 59, 62, 65],   # Gmaj7
+            [57, 60, 64, 67],   # A-7
+            [53, 57, 60, 64]    # Fmaj7
+        ]
     elif chord_style == "sus":
         chord_progression = [
-        [60, 65, 67],       # Csus4
-        [57, 62, 64],       # Asus4
-        [55, 60, 62],       # Gsus4
-        [53, 58, 60]        # Fsus4
-    ]
+            [60, 65, 67],       # Csus4
+            [57, 62, 64],       # Asus4
+            [55, 60, 62],       # Gsus4
+            [53, 58, 60]        # Fsus4
+        ]
     elif chord_style == "transition":
         chord_progression = [
-        [60, 64, 67],
-        [62, 65, 69],
-        [59, 63, 66],
-        [60, 64, 67]
-    ]
+            [60, 64, 67],
+            [62, 65, 69],
+            [59, 63, 66],
+            [60, 64, 67]
+        ]
     elif chord_style == "diminished":
         chord_progression = [
-        [60, 63, 66],       # Cdim
-        [62, 65, 68],       # Ddim
-        [59, 62, 65],       # Bdim
-        [57, 60, 63]        # A#dim
-    ]
+            [60, 63, 66],       # Cdim
+            [62, 65, 68],       # Ddim
+            [59, 62, 65],       # Bdim
+            [57, 60, 63]        # A#dim
+        ]
     elif chord_style == "augmented":
         chord_progression = [
-        [60, 64, 68],       # Caug
-        [62, 66, 70],       # Daug
-        [59, 63, 67],       # Baug
-        [55, 59, 63]        # G#aug
-    ]
+            [60, 64, 68],       # Caug
+            [62, 66, 70],       # Daug
+            [59, 63, 67],       # Baug
+            [55, 59, 63]        # G#aug
+        ]
     else:
         chord_progression = None
 
@@ -702,7 +706,7 @@ def generate_music(section_types=None):
         elif "random arpeggio" in prompt_lower:
             prompt_style = "random"
 
-    # Pak pokračuje funkce make_pattern a použití arpeggia
+        # Pak pokračuje funkce make_pattern a použití arpeggia
 
 
         arpeggio_instrument = melody_instrument if melody_instrument != 0 else 80
@@ -744,20 +748,20 @@ def generate_music(section_types=None):
             if base >= length:
                 break
 
-# --- úsek po veškerém přidávání not, těsně před uložením do MIDI ---
+    # --- úsek po veškerém přidávání not, těsně před uložením do MIDI ---
     MIN_NOTE_DURATION = 0.5   # minimální délka tónu (s) – klidně si uprav
 
-    for note in note_sequence.notes:
-        if not note.is_drum:
-            duration = note.end_time - note.start_time
-        if duration < MIN_NOTE_DURATION:
-            note.end_time = note.start_time + MIN_NOTE_DURATION
+    if melody_instrument is not None:
+        for note in note_sequence.notes:
+            if not note.is_drum:
+                duration = note.end_time - note.start_time
+                if duration < MIN_NOTE_DURATION:
+                    note.end_time = note.start_time + MIN_NOTE_DURATION
 
-        # b) sjednoť nástroj melodické vrstvy (nástroje 1-4 a 9 už necháváme)
-        if note.instrument not in [1, 2, 3, 4, 9]:
-            note.instrument = 0
-            note.program = melody_instrument
-
+                # b) sjednoť nástroj melodické vrstvy (nástroje 1-4 a 9 už necháváme)
+                if note.instrument not in [1, 2, 3, 4, 9]:
+                    note.instrument = 0
+                    note.program = melody_instrument
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     filename_base = f"generated_{model}_{length}s_{tempo}bpm_{temperature}temp_inst{melody_instrument}_{timestamp}"
