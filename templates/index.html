@@ -103,14 +103,19 @@
 
     <form id="musicForm">
         <div class="form-group">
+            <label for="title" class="prompt-label">Název skladby (volitelné):</label>
+            <input type="text" class="form-control" id="title" name="title" placeholder="Např. Moje rocková pecka">
+
             <label for="prompt" class="prompt-label">Zadejte popis skladby:</label>
             <textarea class="form-control" id="prompt" name="prompt" rows="3"></textarea>
             <small class="form-text text-muted mt-2">
                 Zadejte žánr, tempo, nástroje, délku, náladu atd. Např: 'Rychlá rocková skladba s bubny a elektrickou kytarou, tempo 140...'
             </small>
         </div>
+
         <button type="submit" id="generateButton" class="btn btn-primary btn-block">Generovat hudbu</button>
     </form>
+
 
     <div id="statusMessage" class="status-message alert" style="display: none;"></div>
     <div id="download-buttons-container"></div>
@@ -121,6 +126,8 @@
         event.preventDefault();
 
         const prompt = document.getElementById('prompt').value;
+        const title = document.getElementById('title').value;
+
         if (!prompt.trim()) {
             alert('Zadejte prosím popis skladby.');
             return;
@@ -143,7 +150,7 @@
         fetch('/generate_music', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt: prompt })
+            body: JSON.stringify({ prompt: prompt, title: title })
         })
             .then(response => {
                 if (!response.ok) {
@@ -163,18 +170,30 @@
                 statusMessage.innerText = 'Hudba byla úspěšně vygenerována!';
                 statusMessage.className = 'status-message alert alert-success';
 
+                const midiFilename = data.midi_file.split('/').pop();
+                const wavFilename = data.wav_file.split('/').pop();
+
                 downloadButtonsContainer.innerHTML = `
-            <a href="/download_music/${data.midi_file.split('/').pop()}" class="btn btn-primary">Stáhnout MIDI</a>
-            <a href="/download_music/${data.wav_file.split('/').pop()}" class="btn btn-success">Stáhnout WAV</a>
-            <br>
-            <audio controls style="margin-top: 15px; width: 100%;">
-              <source src="${data.wav_file}" type="audio/wav">
-              Váš prohlížeč nepodporuje přehrávání audia.
-            </audio>
-          `;
+                    <a href="/download_music/${midiFilename}"
+                        class="btn btn-primary"
+                        download="${midiFilename}">
+                        Stáhnout MIDI</a>
+
+                    <a href="/download_music/${wavFilename}"
+                        class="btn btn-success"
+                        download="${wavFilename}">
+                        Stáhnout WAV</a>
+
+                    <br>
+                    <audio controls style="margin-top: 15px; width: 100%;">
+                        <source src="/download_music/${wavFilename}" type="audio/wav">
+                        Váš prohlížeč nepodporuje přehrávání audia.
+                    </audio>
+                `;
                 downloadButtonsContainer.style.display = 'block';
             })
-            .catch(error => {
+
+                .catch(error => {
                 console.error('Došlo k chybě:', error);
                 statusMessage.innerText = 'Chyba: ' + error.message;
                 statusMessage.className = 'status-message alert alert-danger';

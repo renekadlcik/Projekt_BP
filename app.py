@@ -26,7 +26,8 @@ HISTORY_FILE = "history.json"
 
 BUNDLE_PATHS = {
     "basic_rnn": "bundles/basic_rnn.mag",
-    "attention_rnn": "bundles/attention_rnn.mag"
+    "attention_rnn": "bundles/attention_rnn.mag",
+    "lookback_rnn": "bundles/lookback_rnn.mag"
 }
 
 # Upravit cestu k SoundFontu - ZKONTROLUJTE TUTO CESTU!
@@ -244,9 +245,10 @@ def parse_prompt(prompt, current_params):
     # Přednastavení modelu z promptu
     if "attention rnn" in prompt_lower:
         parsed_params["model"] = "attention_rnn"
+    elif "lookback rnn" in prompt_lower:
+        parsed_params["model"] = "lookback_rnn"
     elif "basic rnn" in prompt_lower:
         parsed_params["model"] = "basic_rnn"
-
 
     tempo_match = re.search(r'(\d+)\s*(bpm|tempo)', prompt_lower)
     if tempo_match:
@@ -431,17 +433,17 @@ def apply_tempo_curve(note_sequence, section_types, base_tempo=120):
 
     for i, section in enumerate(section_types):
         tempo_change = base_tempo
-    if section == "verse":
-        tempo_change = base_tempo
-    elif section == "chorus":
-        tempo_change = int(base_tempo * 1.1)
-    elif section == "bridge":
-        tempo_change = int(base_tempo * 0.9)
-    elif section == "outro":
-        tempo_change = int(base_tempo * 0.8)
+        if section == "verse":
+            tempo_change = base_tempo
+        elif section == "chorus":
+            tempo_change = int(base_tempo * 1.1)
+        elif section == "bridge":
+            tempo_change = int(base_tempo * 0.9)
+        elif section == "outro":
+            tempo_change = int(base_tempo * 0.8)
 
-    note_sequence.tempos.add().qpm = tempo_change
-    note_sequence.tempos[-1].time = i * section_length
+        note_sequence.tempos.add().qpm = tempo_change
+        note_sequence.tempos[-1].time = i * section_length
 
 @app.route("/generate_music", methods=["POST"])
 def generate_music(section_types=None):
@@ -455,6 +457,7 @@ def generate_music(section_types=None):
         "model": "basic_rnn", "instrument": 0 # Defaultní hlavní nástroj (piano)
     }
     prompt = data.get("prompt", "")
+    title = data.get("title", "").strip()
     parsed_params = parse_prompt(prompt, current_params)
     prompt_lower = parsed_params.get("prompt_lower", "")
 
@@ -763,12 +766,22 @@ def generate_music(section_types=None):
                     note.instrument = 0
                     note.program = melody_instrument
 
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename_base = f"generated_{model}_{length}s_{tempo}bpm_{temperature}temp_inst{melody_instrument}_{timestamp}"
+    safe_title = title.replace(" ", "_") if title else ""
 
-    # Použijeme relativní cesty pro uložení
-    midi_path = os.path.join(OUTPUT_DIR, filename_base + ".mid")
-    wav_path = os.path.join(OUTPUT_DIR, filename_base + ".wav")
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+
+    if safe_title:
+        # Použijeme pouze název od uživatele
+        midi_filename = f"{safe_title}.mid"
+        wav_filename = f"{safe_title}.wav"
+    else:
+        # Výchozí název s detaily skladby
+        midi_filename = f"generated_{model}_{length}s_{tempo}bpm_{timestamp}.mid"
+        wav_filename = f"generated_{model}_{length}s_{tempo}bpm_{timestamp}.wav"
+
+    # Cesty k souborům (vždy se provede)
+    midi_path = os.path.join(OUTPUT_DIR, midi_filename)
+    wav_path = os.path.join(OUTPUT_DIR, wav_filename)
 
     midi_io.sequence_proto_to_midi_file(note_sequence, midi_path)
 
@@ -807,6 +820,7 @@ def generate_music(section_types=None):
     # --- KONEC DŮLEŽITÉ OPRAVY ---
 
     history_record = {
+        "title": title or "Bez názvu",
         "timestamp": timestamp,
         "model": model,
         "length": length,
