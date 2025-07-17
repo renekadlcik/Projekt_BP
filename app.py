@@ -1,18 +1,20 @@
 from __future__ import annotations
-
 import os
 import subprocess
 from datetime import datetime
+
+import note_seq
+from Scripts.rst2odt import output
 from flask import Flask, request, jsonify, send_from_directory, render_template
 import json
-
 import magenta
+from magenta.models import melody_rnn
 from magenta.models.melody_rnn import melody_rnn_sequence_generator
 from magenta.models.shared import sequence_generator_bundle
 from note_seq import midi_io
 from note_seq.protobuf import music_pb2
 from note_seq.protobuf import generator_pb2
-
+from note_seq import sequences_lib
 import midi2audio
 from midi2audio import FluidSynth as Synth
 import re
@@ -120,6 +122,71 @@ GENRE_MAP = {
     "arpeggio": {"add_arpeggio": True},
     "solo": {"solo_mode": True},
 }
+
+# Definuj nástroje
+pad_instrument = 89            # Pad 1 (new age)
+chord_instrument = 1           # Acoustic Grand Piano
+bass_instrument = 33           # Electric Bass (finger)
+
+def generate_pad(notes, chord, start, end, pad_instrument):
+    for pitch in chord[:3]:  # použijeme první tři tóny akordu
+        n = notes.add()
+        n.pitch = pitch - 12  # o oktávu níže
+        n.start_time = start
+        n.end_time = end
+        n.velocity = 60
+        n.instrument = 3
+        n.program = pad_instrument
+        n.is_drum = False
+
+def generate_chords(notes, chord, start, chord_instrument):
+    for pitch in chord:
+        n = notes.add()
+        n.pitch = pitch
+        n.start_time = start
+        n.end_time = start + 1.5
+        n.velocity = 70
+        n.instrument = 2
+        n.program = chord_instrument
+        n.is_drum = False
+
+def generate_bass(notes, pitch, start, bass_instrument):
+    n = notes.add()
+    n.pitch = pitch
+    n.start_time = start
+    n.end_time = start + 1.5
+    n.velocity = 80
+    n.instrument = 1
+    n.program = bass_instrument
+    n.is_drum = False
+
+def generate_drums(notes, start):
+    kick = notes.add()
+    kick.pitch = 36
+    kick.start_time = start
+    kick.end_time = start + 0.2
+    kick.velocity = 100
+    kick.instrument = 9
+    kick.is_drum = True
+
+    snare = notes.add()
+    snare.pitch = 38
+    snare.start_time = start + 1.0
+    snare.end_time = start + 1.2
+    snare.velocity = 90
+    snare.instrument = 9
+    snare.is_drum = True
+
+    for i in [0, 0.5, 1, 1.5]:
+        hihat = notes.add()
+        hihat.pitch = 42
+        hihat.start_time = start + i
+        hihat.end_time = start + i + 0.1
+        hihat.velocity = 70
+        hihat.instrument = 9
+        hihat.is_drum = True
+
+
 # --- nový blok -----------------------------------------------------------
 def prepare_layers_for_genre(genre_key: str,
                              melody_instrument: int | None = None,
@@ -161,6 +228,118 @@ def prepare_layers_for_genre(genre_key: str,
     return base
 # --- konec nového bloku ---------------------------------------------------
 
+def generate_section_with_style(generator, primer_sequence, section_name, start_time):
+    # Defaultní parametry
+    length_map = {
+        'intro': 16,
+        'verse': 32,
+        'chorus': 32,
+        'bridge': 32,
+        'outro': 16
+    }
+
+    temperature_map = {
+        'intro': 0.7,
+        'verse': 1.0,
+        'chorus': 1.2,
+        'bridge': 0.9,
+        'outro': 0.6
+    }
+
+    instrument_map = {
+        'intro': 0, # Piano
+        'verse': 24, # Guitar
+        'chorus': 30, # Overdriven Guitar
+        'bridge': 40, # Violin
+        'outro': 0 # Piano
+    }
+
+    # Urči délku a teplotu podle sekce
+    total_steps = length_map.get(section_name, 32)
+    temperature = temperature_map.get(section_name, 1.0)
+    instrument = instrument_map.get(section_name, 0)
+
+    generator_options = generator_pb2.GeneratorOptions()
+    generator_options.generate_sections.add(
+        start_time=start_time,
+        end_time=start_time + total_steps * 0.25 # 0.25 sekundy = 1 krok při 4 krocích za čtvrťovou
+    )
+    generator_options.args['temperature'].float_value = temperature
+
+    del primer_sequence.notes[:]
+
+    generated_sequence = generator.generate(primer_sequence, generator_options)
+
+    # Nastavení nástroje pro každou notu této sekce
+    for note in generated_sequence.notes:
+        if start_time <= note.start_time < start_time + total_steps * 0.25:
+            note.instrument = instrument
+
+    return generated_sequence, total_steps * 0.25
+
+def generate_full_song(generator, primer_sequence):
+    final_sequence = note_seq.NoteSequence()
+    start_time = 0.0
+
+    # Seznam sekcí ve skladbě
+    song_structure = ['intro', 'verse', 'chorus', 'verse', 'bridge', 'outro']
+
+    for i, section in enumerate(song_structure):
+        print(f"Generuji část: {section}...")
+
+        if i == 0:
+            primer = primer_sequence
+        else:
+            primer = note_seq.NoteSequence()
+
+        section_sequence, section_duration = generate_section_with_style(
+            generator,
+            primer_sequence,
+            section,
+            start_time
+        )
+
+        # Přidej noty z této sekce do finální sekvence
+        for note in section_sequence.notes:
+            final_sequence.notes.add().CopyFrom(note)
+
+        # Aktualizuj čas začátku pro další sekci
+        start_time += section_duration
+
+    # Zkopíruj metadata (tempo, tonality atd.) z poslední sekce
+    final_sequence.tempos.extend(section_sequence.tempos)
+    final_sequence.ticks_per_quarter = section_sequence.ticks_per_quarter
+    final_sequence.total_time = start_time
+
+    return final_sequence
+
+def generate_full_song_structure(generator, primer_sequence):
+    sections = ['intro', 'verse', 'chorus', 'verse', 'bridge', 'outro']
+    full_sequence = music_pb2.NoteSequence()
+    current_start_time = 0.0
+
+    for section in sections:
+        generated_part = generate_section_with_style(
+            generator,
+            primer_sequence,
+            section_name=section,
+            start_time=current_start_time
+        )
+
+        # Přidej noty ze sekce do hlavní sekvence
+        for note in generated_part.notes:
+            full_sequence.notes.add().CopyFrom(note)
+
+        # Posuň časový ukazatel
+        section_duration = max(
+            (note.end_time for note in generated_part.notes),
+            default=current_start_time
+        )
+        current_start_time = section_duration
+
+    full_sequence.total_time = current_start_time
+    full_sequence.tempos.add(qpm=120) # nebo jiná hodnota podle promptu
+    return full_sequence
 
 def save_history(record):
     history = []
@@ -466,8 +645,8 @@ def generate_music(section_types=None):
     temperature = parsed_params["temperature"]
     model = parsed_params["model"]
     layers = prepare_layers_for_genre(parsed_params.get("genre") or "pop",
-                                      melody_instrument=parsed_params["melody_instrument"],
-                                      pad_instrument=parsed_params["pad_instrument"])
+        melody_instrument=parsed_params["melody_instrument"],
+        pad_instrument=parsed_params["pad_instrument"])
 
     melody_instrument = layers["melody"]
     # Pokud je žánr rock, nechceme melodii (vypneme ji nastavením na None)
@@ -501,20 +680,67 @@ def generate_music(section_types=None):
     # První tempo (počáteční hodnota), detailnější křivku aplikujeme až později
     input_sequence.tempos.add(qpm=tempo)
 
-    generator_options = generator_pb2.GeneratorOptions()
-    generator_options.args["temperature"].float_value = temperature
-    generator_options.generate_sections.add(start_time=input_sequence.total_time, end_time=length)
-    note_sequence = melody_rnn.generate(input_sequence, generator_options)
+    # Vytvoření sekcí skladby (intro + hlavní části)
+    section_duration = 8  # délka sekce v sekundách
+    sections = int(length // section_duration)
+    section_types = ["intro"] + [get_section_type(i) for i in range(sections)]
+
+    full_sequence = music_pb2.NoteSequence()
+    start_time = 0.5
+
+    # Vytvoření prázdné základní sekvence pro generování
+    primer_sequence = music_pb2.NoteSequence()
+    primer_sequence.tempos.add(qpm=tempo)  # tempo už máš definované z promptu
+    primer_sequence.ticks_per_quarter = 220
+
+    # Načti .mag model
+    bundle = sequence_generator_bundle.read_bundle_file('bundles/lookback_rnn.mag')
+
+    # Vytvoř generátor
+    generator_map = melody_rnn_sequence_generator.get_generator_map()
+    generator = generator_map['lookback_rnn'](checkpoint=None, bundle=bundle)
+
+    generator.initialize()
+
+    for section_type in section_types:
+        section_length = section_duration
+        generated = generate_section(
+            generator=melody_rnn,
+            primer_sequence=primer_sequence,
+            total_steps=section_length,
+            temperature=temperature
+            )
+
+    for note in generated.notes:
+        full_sequence.notes.add().CopyFrom(note)
+        start_time += section_length
+
+    note_sequence = full_sequence
+
     # Výpočet sekcí a jejich typů před aplikací tempa
-    section_duration = 8  # délka sekce v sekundách (můžeš upravit)
-    sections = int(length // section_duration) + 1
-    section_types = [get_section_type(i) for i in range(sections)]
+    section_duration = 8  # délka sekce v sekundách
+    custom_section_match = re.findall(r'(intro|verse|chorus|bridge|outro)', prompt_lower)
+    if custom_section_match:
+        section_types = custom_section_match
+    else:
+        sections = int(length // section_duration)
+        section_types = ["intro"] + [get_section_type(i) for i in range(sections)]
 
     # Aplikace tempo křivky
     apply_tempo_curve(note_sequence, section_types, base_tempo=tempo)
 
     # Nové styly akordů podle typu
     chord_style = parsed_params.get("chord_style", "standard")
+
+    output_sequence = primer_sequence
+    start_time = primer_sequence.total_time
+
+    sections = ['intro', 'verse', 'chorus', 'verse' 'bridge', 'outro']
+    for section in sections:
+        generated_part, duration = generate_section_with_style(generator, output_sequence, section, start_time)
+        start_time += duration
+        output_sequence.notes.extend(generated_part.notes)
+        output_sequence.total_time = start_time
 
     if chord_style == "seventh":
         chord_progression = [
@@ -846,6 +1072,41 @@ def generate_music(section_types=None):
         "midi_file": f"/download_music/{os.path.basename(midi_path)}",
         "wav_file": f"/download_music/{os.path.basename(wav_path)}"
     })
+
+def generate_jazzy_chords(notes, chord, start_time, chord_instrument):
+    pass
+
+def generate_section(generator, primer_sequence, total_steps=16, temperature=1.0):
+    from note_seq.protobuf import generator_pb2
+
+    generator_options = generator_pb2.GeneratorOptions()
+    generate_section = generator_options.generate_sections.add()
+    generate_section.start_time = primer_sequence.total_time
+    generate_section.end_time = primer_sequence.total_time + total_steps
+    generator_options.args['temperature'].float_value = temperature
+
+    # Tady je klíčová oprava: zavoláme metodu `generate()` na instanci generátoru
+    generated_sequence = generate_full_song(generator, primer_sequence)
+
+    return generated_sequence
+
+    # Spoj původní a novou část
+    final_sequence = magenta.music.sequences_lib.concatenate_sequences([primer_sequence, generated_sequence])
+    notes = final_sequence.notes
+
+    # Akord – například C dur
+    chord = [60, 64, 67]
+
+    # Přidání dalších vrstev
+    start_time = primer_sequence.total_time
+    generate_pad(notes, chord, start_time, start_time + total_steps, pad_instrument)
+    generate_jazzy_chords(notes, chord, start_time, chord_instrument)
+    generate_bass(notes, chord[0] - 12, start_time, bass_instrument)
+    generate_drums(notes, start_time)
+
+    # Aktualizuj celkový čas
+    final_sequence.total_time = start_time + total_steps
+    return final_sequence
 
 @app.route("/download_music/<filename>")
 def download_music(filename):
