@@ -57,6 +57,14 @@ INSTRUMENT_MIDI_MAP = {
     "drums": 128
 }
 
+CHORD_PROGRESSIONS = {
+    'intro': ['C', 'F'],
+    'verse': ['C', 'Am', 'F', 'G'],
+    'chorus': ['C', 'G', 'Am', 'F'],
+    'bridge': ['Dm', 'G', 'Em', 'A'],
+    'outro': ['C', 'F']
+}
+
 REVERSE_INSTRUMENT_MIDI_MAP = {v: k.replace("_", " ").title() for k, v in INSTRUMENT_MIDI_MAP.items()}
 REVERSE_INSTRUMENT_MIDI_MAP[128] = "Drums"
 
@@ -149,6 +157,16 @@ def generate_chords(notes, chord, start, chord_instrument):
         n.instrument = 2
         n.program = chord_instrument
         n.is_drum = False
+
+def add_chords_to_sequence(sequence, start_time, duration, section_name='verse'):
+    chords = CHORD_PROGRESSIONS.get(section_name, ['C', 'F', 'G', 'C'])
+    steps_per_chord = duration / len(chords)
+
+    for i, chord in enumerate(chords):
+        annotation = sequence.text_annotations.add()
+        annotation.time = start_time + i * steps_per_chord
+        annotation.text = chord
+        annotation.annotation_type = note_seq.NoteSequence.TextAnnotation.CHORD_SYMBOL
 
 def generate_bass(notes, pitch, start, bass_instrument):
     n = notes.add()
@@ -298,6 +316,9 @@ def generate_full_song(generator, primer_sequence):
             section,
             start_time
         )
+
+        # Přidej akordy do sekce (dle sekce)
+        add_chords_to_sequence(final_sequence, start_time, section_duration, section)
 
         # Přidej noty z této sekce do finální sekvence
         for note in section_sequence.notes:
@@ -582,7 +603,6 @@ def parse_prompt(prompt, current_params):
     else:
         parsed_params["chord_style"] = "standard"
 
-
     parsed_params["genre"] = detected_Genre
 
     parsed_params["prompt_lower"] = prompt_lower
@@ -639,6 +659,31 @@ def generate_music(section_types=None):
     title = data.get("title", "").strip()
     parsed_params = parse_prompt(prompt, current_params)
     prompt_lower = parsed_params.get("prompt_lower", "")
+
+    # pokud uživatel zvolil předvolbu, použij její hodnoty
+    preset = data.get("preset")
+    PRESETS = {
+        'pop_default': {'model':'lookback_rnn','genre':'pop','length':30,'tempo':120,'temperature':1.0},
+        'rock_fast': {'model':'basic_rnn','genre':'rock','length':30,'tempo':160,'temperature':0.8},
+        'jazz_slow': {'model':'attention_rnn','genre':'jazz','length':30,'tempo':90,'temperature':1.2},
+    }
+    if preset in PRESETS:
+        for k, v in PRESETS[preset].items():
+            parsed_params[k] = v
+
+
+    # přepiš hodnoty z dropdownů, pokud přišly
+    if data.get("model"):
+        parsed_params["model"] = data["model"]
+    if data.get("genre"):
+        parsed_params["genre"] = data["genre"]
+    if data.get("length"):
+        parsed_params["length"] = int(data["length"])
+    if data.get("tempo"):
+        parsed_params["tempo"] = float(data["tempo"])
+    if data.get("temperature"):
+        parsed_params["temperature"] = float(data["temperature"])
+    # případně tempo, temperature, instrument atp. stejným způsobem
 
     length = parsed_params["length"]
     tempo = parsed_params["tempo"]

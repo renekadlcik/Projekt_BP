@@ -28,11 +28,12 @@
         }
 
         .container {
-            max-width: 600px;
+            max-width: 1000px;
             background-color: #ffffff;
             padding: 30px;
-            border-radius: 8px;
+            border-radius: 15px;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            transform: translateY(-150px);
         }
 
         h1 {
@@ -75,9 +76,10 @@
         .theme-button {
             position: absolute;
             top: 20px;
-            left: 20px;
-            padding: 6px 12px;
-            border-radius: 8px;
+            left: 10px;
+            padding: 4px 10px;
+            font-size: 0.875rem;
+            border-radius: 12px;
             border: none;
             cursor: pointer;
             font-weight: bold;
@@ -91,6 +93,7 @@
         }
     </style>
 </head>
+
 <body>
 <div class="history-button-container">
     <a href="/history" class="btn btn-secondary btn-sm">Historie skladeb</a>
@@ -101,7 +104,6 @@
 <div class="container">
     <h1 class="text-center mb-4">Generátor AI hudby</h1>
 
-    <form id="musicForm">
         <div class="form-group">
             <label for="title" class="prompt-label">Název skladby (volitelné):</label>
             <input type="text" class="form-control" id="title" name="title" placeholder="Např. Moje rocková pecka">
@@ -117,8 +119,49 @@
             <small class="form-text text-muted mt-2">
                 Zadejte žánr, tempo, nástroje, délku, náladu atd. Např: 'Rychlá rocková skladba s bubny a elektrickou kytarou, tempo 140...'
             </small>
-
         </div>
+
+        <!-- 1) Dropdown model -->
+        <div>
+            <label for="model-select"class="prompt-label">Model:</label>
+            <select id="model-select">
+                <option value="basic_rnn">Basic RNN (výchozí)</option>
+                <option value="attention_rnn">Attention RNN</option>
+                <option value="lookback_rnn">Lookback RNN</option>
+            </select>
+        </div>
+
+            <!-- 2) Dropdown žánr -->
+            <div>
+                <label for="genre-select"class="prompt-label">Žánr:</label>
+                <select id="genre-select">
+                    <option value="pop">Pop (výchozí)</option>
+                    <option value="rock">Rock</option>
+                    <option value="jazz">Jazz</option>
+                    <option value="classical">Classical</option>
+                    <option value="electronic">Electronic</option>
+                </select>
+            </div>
+
+            <!-- 3) Volný vstup délky -->
+            <div>
+                <label for="length-input" class="prompt-label">Délka (s):</label>
+                <input id="length-input" type="number" min="1" value="30" class="form-control d-inline-block"
+                       style="width: 8ch;">
+            </div>
+        </form>
+
+    <form id="musicForm">
+        <div class="form-group">
+            <label for="preset"class="prompt-label">Předvolba:</label>
+            <select id="preset" name="preset" class="form-control">
+                <option value="">Žádná</option>
+                <option value="pop_default" selected>Pop (výchozí)</option>
+                <option value="rock_fast">Rock - rychlý</option>
+                <option value="jazz_slow">Jazz - pomalý</option>
+            </select>
+        </div>
+
 
         <button type="submit" id="generateButton" class="btn btn-primary btn-block">Generovat hudbu</button>
     </form>
@@ -214,6 +257,40 @@
 </script>
 
 <script>
+document.getElementById('gen-form').addEventListener('submit', async e => {
+    e.preventDefault();
+
+    const prompt = document.getElementById('prompt').value;
+    const model = document.getElementById('model-select').value;
+    const genre = document.getElementById('genre-select').value;
+    const length = parseInt(document.getElementById('length-input').value, 10);
+
+    const payload = {
+        prompt,
+        model,
+        genre,
+        length
+    };
+
+    const resp = await fetch('/generate_music', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(payload)
+    });
+
+    if (!resp.ok) {
+        const err = await resp.json();
+        alert('Chyba: ' + (err.error||resp.status));
+        return;
+    }
+
+    const data = await resp.json();
+    // tady nově zobrazíš odkazy na midi/wav, jak máš teď
+    console.log(data);
+});
+</script>
+
+<script>
     const themes = ['theme-light', 'theme-dark', 'theme-neon'];
     let currentThemeIndex = 0;
 
@@ -237,6 +314,23 @@
             applyTheme(0);
         }
     });
+</script>
+
+<script>
+const PRESETS = {
+    pop_default: { model: 'lookback_rnn', genre: 'pop', length: '30', tempo: '120', temperature: '1.0'},
+    rock_fast: { model: 'basic_rnn', genre: 'rock', length: '30', tempo: '160', temperature: '0.8'},
+    jazz_slow: { model: 'attention_rnn', genre: 'jazz', length: '30', tempo: '90', temperature: '1.2'}
+};
+
+document.getElementById('preset').addEventListener('change', e => {
+    const vals = PRESETS[e.target.value] || {};
+    // projdi všechny klíče a najdi odpovídající input/select
+    for (let [key, val] of Object.entries(vals)) {
+        const el = document.querySelector(`[name="${key}"]`);
+        if (el) el.value = val;
+    }
+});
 </script>
 </body>
 </html>
