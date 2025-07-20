@@ -21,6 +21,8 @@ import re
 
 app = Flask(__name__)
 
+app.jinja_env.add_extension('jinja2.ext.do')
+
 OUTPUT_DIR = "generated_music_files"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
@@ -611,7 +613,7 @@ def parse_prompt(prompt, current_params):
 
 @app.route("/")
 def index():
-    return render_template("index.html")
+    return render_template("index.html", instruments=INSTRUMENT_MIDI_MAP, chord_map=CHORD_PROGRESSIONS)
 
 @app.route("/history")
 def history():

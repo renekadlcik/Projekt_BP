@@ -104,16 +104,21 @@
 <div class="container">
     <h1 class="text-center mb-4">Generátor AI hudby</h1>
 
+    <form id="musicForm">
         <div class="form-group">
             <label for="title" class="prompt-label">Název skladby (volitelné):</label>
             <input type="text" class="form-control" id="title" name="title" placeholder="Např. Moje rocková pecka">
+        </div>
 
+        <div class="form-group">
             <label for="structure" class="prompt-label">Struktura skladby (volitelné):</label>
             <input type="text" class="form-control" id="structure" name="structure" placeholder="Např. intro, verse, chorus, bridge, outro">
             <small class="form-text text-muted mt-2">
                 Můžeš napsat strukturu skladby, např. "intro, verse, chorus, verse, chorus, outro"
             </small>
+        </div>
 
+        <div class="form-group">
             <label for="prompt" class="prompt-label">Zadejte popis skladby:</label>
             <textarea class="form-control" id="prompt" name="prompt" rows="3"></textarea>
             <small class="form-text text-muted mt-2">
@@ -122,8 +127,8 @@
         </div>
 
         <!-- 1) Dropdown model -->
-        <div>
-            <label for="model-select"class="prompt-label">Model:</label>
+        <div class="form-group">
+            <label for="model-select" class="prompt-label">Model:</label>
             <select id="model-select">
                 <option value="basic_rnn">Basic RNN (výchozí)</option>
                 <option value="attention_rnn">Attention RNN</option>
@@ -131,59 +136,108 @@
             </select>
         </div>
 
-            <!-- 2) Dropdown žánr -->
-            <div>
-                <label for="genre-select"class="prompt-label">Žánr:</label>
-                <select id="genre-select">
-                    <option value="pop">Pop (výchozí)</option>
-                    <option value="rock">Rock</option>
-                    <option value="jazz">Jazz</option>
-                    <option value="classical">Classical</option>
-                    <option value="electronic">Electronic</option>
-                </select>
-            </div>
-
-            <!-- 3) Volný vstup délky -->
-            <div>
-                <label for="length-input" class="prompt-label">Délka (s):</label>
-                <input id="length-input" type="number" min="1" value="30" class="form-control d-inline-block"
-                       style="width: 8ch;">
-            </div>
-        </form>
-
-    <form id="musicForm">
+        <!-- 2) Dropdown žánr -->
         <div class="form-group">
-            <label for="preset"class="prompt-label">Předvolba:</label>
-            <select id="preset" name="preset" class="form-control">
-                <option value="">Žádná</option>
-                <option value="pop_default" selected>Pop (výchozí)</option>
-                <option value="rock_fast">Rock - rychlý</option>
-                <option value="jazz_slow">Jazz - pomalý</option>
+            <label for="genre-select" class="prompt-label">Žánr:</label>
+            <select id="genre-select">
+                <option value="pop">Pop (výchozí)</option>
+                <option value="rock">Rock</option>
+                <option value="jazz">Jazz</option>
+                <option value="classical">Classical</option>
+                <option value="electronic">Electronic</option>
             </select>
         </div>
 
+        <!-- 3) Volný vstup délky -->
+        <div class="form-group">
+            <label for="length-input" class="prompt-label">Délka (s):</label>
+            <input id="length-input" type="number" min="1" value="30" class="form-control d-inline-block"
+                   style="width: 8ch;">
+        </div>
 
+        <!-- 4) Volný vstup tempa -->
+        <div class="form-group">
+            <label for="tempo-input" class="prompt-label">Tempo (BPM):</label>
+            <input id="tempo-input" name="tempo" type="number" min="20" max="300" value="120" class="form-control" style="width: 8ch;">
+        </div>
+
+        <!-- INSTRUMENTY -->
+        <div class="form-group">
+            <label class="prompt-label">Nástroje:</label>
+            <div id="instruments-container">
+                <div class="instrument-item mb-2">
+                    <select name="instruments[]" class="form-control d-inline-block" style="width:auto;">
+                        {% for name, midi in instruments.items() %}
+                            <option value="{{ midi }}">{{ name.title() }}</option>
+                        {% endfor %}
+                    </select>
+                    <button type="button" class="btn btn-sm btn-danger remove-item">✕</button>
+                </div>
+            </div>
+            <button type="button" id="add-instrument" class="btn btn-sm btn-secondary">+ Přidat nástroj</button>
+        </div>
+
+        <!-- AKORDY -->
+        <div class="form-group">
+            <label class="prompt-label">Akord:</label>
+            <div id="chords-container">
+                <div class="chord-item mb-2">
+                    <select name="chords[]" class="form-control d-inline-block" style="width:auto;">
+                        {% set seen = [] %}
+                        {% for seq in chord_map.values() %}
+                            {% for ch in seq %}
+                                {% if ch not in seen %}
+                                    {% do seen.append(ch) %}
+                                    <option value="{{ ch }}">{{ ch }}</option>
+                                {% endif %}
+                            {% endfor %}
+                        {% endfor %}
+                    </select>
+                    <button type="button" class="btn btn-sm btn-danger remove-item">✕</button>
+                </div>
+            </div>
+            <button type="button" id="add-chord" class="btn btn-sm btn-secondary">+ Přidat akord</button>
+        </div>
         <button type="submit" id="generateButton" class="btn btn-primary btn-block">Generovat hudbu</button>
     </form>
-
 
     <div id="statusMessage" class="status-message alert" style="display: none;"></div>
     <div id="download-buttons-container"></div>
 </div>
 
 <script>
-    document.getElementById('musicForm').addEventListener('submit', function (event) {
-        event.preventDefault();
+    document.getElementById('musicForm').addEventListener('submit', async function (e) {
+        e.preventDefault();
 
-        const prompt = document.getElementById('prompt').value;
-        const title = document.getElementById('title').value;
-        const structure = document.getElementById('structure').value;
+        const promptText = document.getElementById('prompt').value.trim();
+        const title = document.getElementById('title').value.trim();
+        const structure = document.getElementById('structure').value.trim();
+        const model = document.getElementById('model-select').value;
+        const genre = document.getElementById('genre-select').value;
+        const length = parseInt(document.getElementById('length-input').value, 10);
+        const tempo = parseInt(document.getElementById('tempo-input').value, 10);
 
-        if (!prompt.trim()) {
-            alert('Zadejte prosím popis skladby.');
+        // Alespoň jedno z toho musí být: buď prompt, nebo dropdowny
+        if (!promptText && !model && !genre && !length) {
+            alert('Prosím napište prompt nebo vyberte alespoň jeden parametr.');
             return;
         }
 
+        // Postavíme tělo požadavku tak, aby když je promptText, tak se prompt použije,
+        // jinak ho vynecháme a pošlou se dropdownové hodnoty.
+        const body = { title, structure, };
+        if (promptText) {
+            body.prompt = promptText;
+        }
+        // vždycky pošleme tyto čtyři hodnoty, backend na ně může sáhnout
+        body.model = model;
+        body.genre = genre;
+        body.length = length;
+        body.tempo = tempo;
+
+        // (volitelně) případně další parametry: temperature apod.
+
+        // pak úplně stejný fetch jako teď
         const statusMessage = document.getElementById('statusMessage');
         const downloadButtonsContainer = document.getElementById('download-buttons-container');
         const generateButton = document.getElementById('generateButton');
@@ -191,103 +245,88 @@
         statusMessage.innerText = '🎵 Generuji hudbu... Tento proces může chvíli trvat, prosím čekejte.';
         statusMessage.className = 'status-message alert alert-info';
         statusMessage.style.display = 'block';
-
         downloadButtonsContainer.style.display = 'none';
         downloadButtonsContainer.innerHTML = '';
 
         generateButton.disabled = true;
         generateButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Generuji...';
 
-        fetch('/generate_music', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt: prompt, title: title, structure: structure })
-        })
-            .then(response => {
-                if (!response.ok) {
-                    return response.json().then(errorData => {
-                        throw new Error(errorData.error || `HTTP chyba ${response.status}`);
-                    }).catch(() => {
-                        throw new Error(`HTTP chyba ${response.status}`);
-                    });
-                }
-                return response.json();
-            })
-            .then(data => {
-                if (data.error) {
-                    throw new Error(data.error);
-                }
+        // posbíráme všechny vybrané nástroje
+        const instruments = Array.from(
+            document.querySelectorAll('select[name="instruments[]"]')
+        ).map(s => s.value);
 
-                statusMessage.innerText = 'Hudba byla úspěšně vygenerována!';
-                statusMessage.className = 'status-message alert alert-success';
+        // posbíráme všechny vybrané akordy
+        const chords = Array.from(
+            document.querySelectorAll('select[name="chords[]"]')
+        ).map(s => s.value);
 
-                const midiFilename = data.midi_file.split('/').pop();
-                const wavFilename = data.wav_file.split('/').pop();
+        body.instruments = instruments;
+        body.chords = chords;
 
-                downloadButtonsContainer.innerHTML = `
-                    <a href="/download_music/${midiFilename}"
-                        class="btn btn-primary"
-                        download="${midiFilename}">
-                        Stáhnout MIDI</a>
-
-                    <a href="/download_music/${wavFilename}"
-                        class="btn btn-success"
-                        download="${wavFilename}">
-                        Stáhnout WAV</a>
-
-                    <br>
-                    <audio controls style="margin-top: 15px; width: 100%;">
-                        <source src="/download_music/${wavFilename}" type="audio/wav">
-                        Váš prohlížeč nepodporuje přehrávání audia.
-                    </audio>
-                `;
-                downloadButtonsContainer.style.display = 'block';
-            })
-
-                .catch(error => {
-                console.error('Došlo k chybě:', error);
-                statusMessage.innerText = 'Chyba: ' + error.message;
-                statusMessage.className = 'status-message alert alert-danger';
-            })
-            .finally(() => {
-                generateButton.disabled = false;
-                generateButton.innerHTML = 'Generovat hudbu';
+        try {
+            const resp = await fetch('/generate_music', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(body)
             });
-    });
+            const data = await resp.json();
+            if (!resp.ok) throw new Error(data.error || resp.statusText);
+
+            // vypíšeme odkazy na stažení MIDI/WAV
+            statusMessage.innerText = 'Hudba byla úspěšně vygenerována!';
+            statusMessage.className = 'status-message alert alert-success';
+
+            const midiFilename = data.midi_file.split('/').pop();
+            const wavFilename = data.wav_file.split('/').pop();
+            downloadButtonsContainer.innerHTML = `
+                <a href="/download_music/${midiFilename}" class="btn btn-primary" download="${midiFilename}">Stáhnout MIDI</a>
+                <a href="/download_music/${wavFilename}" class="btn btn-success" download="${wavFilename}">Stáhnout WAV</a>
+                <br>
+                <audio controls style="margin-top: 15px; width: 100%;">
+                   <source src="/download_music/${wavFilename}" type="audio/wav">
+                   Váš prohlížeč nepodporuje přehrávání audia.
+                </audio>
+                `;
+            downloadButtonsContainer.style.display = 'block';
+
+        } catch (err) {
+            console.error(err);
+            statusMessage.innerText = 'Chyba: ' + err.message;
+            statusMessage.className = 'status-message alert alert-danger';
+        } finally {
+            generateButton.disabled = false;
+            generateButton.innerHTML = 'Generovat hudbu';
+        }
+      });
 </script>
 
 <script>
-document.getElementById('gen-form').addEventListener('submit', async e => {
-    e.preventDefault();
+    function setupDynamicList(addBtnId, containerId, itemClass) {
+        const addBtn = document.getElementById(addBtnId);
+        const container = document.getElementById(containerId);
 
-    const prompt = document.getElementById('prompt').value;
-    const model = document.getElementById('model-select').value;
-    const genre = document.getElementById('genre-select').value;
-    const length = parseInt(document.getElementById('length-input').value, 10);
+        // když kliknu na "+" - naklonuji první položku
+        addBtn.addEventListener('click', () => {
+            const first = container.querySelector(`.${itemClass}`);
+            const clone = first.cloneNode(true);
+            container.appendChild(clone);
+        });
 
-    const payload = {
-        prompt,
-        model,
-        genre,
-        length
-    };
-
-    const resp = await fetch('/generate_music', {
-        method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify(payload)
-    });
-
-    if (!resp.ok) {
-        const err = await resp.json();
-        alert('Chyba: ' + (err.error||resp.status));
-        return;
+        // když kliknu na "✕" - smažu položku (pokud jich je víc než jedna)
+        container.addEventListener('click', e => {
+            if (e.target.classList.contains('remove-item')) {
+                const item = e.target.closest(`.${itemClass}`);
+                if (container.querySelectorAll(`.${itemClass}`).length > 1) {
+                    item.remove();
+                }
+            }
+        });
     }
 
-    const data = await resp.json();
-    // tady nově zobrazíš odkazy na midi/wav, jak máš teď
-    console.log(data);
-});
+    // inicializace dvou políček
+    setupDynamicList('add-instrument', 'instruments-container', 'instrument-item');
+    setupDynamicList('add-chord', 'chords-container', 'chord-item');
 </script>
 
 <script>
