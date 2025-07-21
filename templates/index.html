@@ -91,6 +91,32 @@
         .theme-button:hover {
             background-color: #0056b3;
         }
+        /* === nový styl pro inline položky === */
+        #instruments-container,
+        #chords-container {
+            display: flex;
+            flex-wrap: wrap;       /* zalomení do dalšího řádku, když je už šířka plná */
+            gap: 0.5rem;           /* mezery mezi položkami */
+            margin-bottom: 1rem;   /* trochu odsazení od tlačítka “+ Přidat…” */
+        }
+
+        .instrument-item,
+        .chord-item {
+            display: flex;
+            align-items: center;
+        }
+
+        /* zkrátíme šířku selectů a přidáme mezeru k “✕” */
+        .instrument-item select,
+        .chord-item select {
+            width: 8ch;            /* nebo jakákoliv jiná vhodná šířka */
+            margin-right: 0.25rem;
+        }
+
+        .instrument-item .remove-item,
+        .chord-item .remove-item {
+            margin-left: 0;
+        }
     </style>
 </head>
 
@@ -263,6 +289,9 @@
 
         body.instruments = instruments;
         body.chords = chords;
+
+        // …tady už máte vybrané instruments a chords…
+        console.log('▶︎ Body payload:', body);
 
         try {
             const resp = await fetch('/generate_music', {

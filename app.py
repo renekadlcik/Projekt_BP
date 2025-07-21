@@ -649,6 +649,7 @@ def apply_tempo_curve(note_sequence, section_types, base_tempo=120):
 @app.route("/generate_music", methods=["POST"])
 def generate_music(section_types=None):
     data = request.json
+    app.logger.info(f"🎹 Received payload: {data}")
     if not data:
         return jsonify({"error": "Nebyla poskytnuta žádná data."}), 400
 
