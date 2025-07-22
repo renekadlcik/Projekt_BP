@@ -18,6 +18,7 @@ from note_seq import sequences_lib
 import midi2audio
 from midi2audio import FluidSynth as Synth
 import re
+import random
 
 app = Flask(__name__)
 
@@ -66,6 +67,30 @@ CHORD_PROGRESSIONS = {
     'bridge': ['Dm', 'G', 'Em', 'A'],
     'outro': ['C', 'F']
 }
+
+CHORD_PITCHES = {
+    "C":     [60, 64, 67],
+    "Cm":    [60, 63, 67],
+    "C7":    [60, 64, 67, 70],
+    "Cmaj7": [60, 64, 67, 71],
+    "Cm7":   [60, 63, 67, 70],
+    "Csus4": [60, 65, 67],
+    "Csus2": [60, 62, 67],
+    "Cdim":  [60, 63, 66],
+    "Caug":  [60, 64, 68],
+    "D":     [62, 66, 69],
+    "Dm":    [62, 65, 69],
+    "D7":    [62, 66, 69, 72],
+    "Dmaj7": [62, 66, 69, 73],
+    "Dm7":   [62, 65, 69, 72],
+    "E":     [64, 68, 71],
+    "Em":    [64, 67, 71],
+    "F":     [65, 69, 72],
+    "G":     [67, 71, 74],
+    "A":     [69, 73, 76],
+    "Am":    [69, 72, 76],
+}
+
 
 REVERSE_INSTRUMENT_MIDI_MAP = {v: k.replace("_", " ").title() for k, v in INSTRUMENT_MIDI_MAP.items()}
 REVERSE_INSTRUMENT_MIDI_MAP[128] = "Drums"
@@ -144,7 +169,7 @@ def generate_pad(notes, chord, start, end, pad_instrument):
         n.pitch = pitch - 12  # o oktávu níže
         n.start_time = start
         n.end_time = end
-        n.velocity = 60
+        n.velocity = random.randint(40, 70)
         n.instrument = 3
         n.program = pad_instrument
         n.is_drum = False
@@ -155,7 +180,7 @@ def generate_chords(notes, chord, start, chord_instrument):
         n.pitch = pitch
         n.start_time = start
         n.end_time = start + 1.5
-        n.velocity = 70
+        n.velocity = random.randint(60, 85)
         n.instrument = 2
         n.program = chord_instrument
         n.is_drum = False
@@ -175,7 +200,7 @@ def generate_bass(notes, pitch, start, bass_instrument):
     n.pitch = pitch
     n.start_time = start
     n.end_time = start + 1.5
-    n.velocity = 80
+    n.velocity = random.randint(70, 100)
     n.instrument = 1
     n.program = bass_instrument
     n.is_drum = False
@@ -185,7 +210,7 @@ def generate_drums(notes, start):
     kick.pitch = 36
     kick.start_time = start
     kick.end_time = start + 0.2
-    kick.velocity = 100
+    kick.velocity = random.randint(90, 120)
     kick.instrument = 9
     kick.is_drum = True
 
@@ -193,7 +218,7 @@ def generate_drums(notes, start):
     snare.pitch = 38
     snare.start_time = start + 1.0
     snare.end_time = start + 1.2
-    snare.velocity = 90
+    snare.velocity = random.randint(85, 110)
     snare.instrument = 9
     snare.is_drum = True
 
@@ -202,7 +227,7 @@ def generate_drums(notes, start):
         hihat.pitch = 42
         hihat.start_time = start + i
         hihat.end_time = start + i + 0.1
-        hihat.velocity = 70
+        hihat.velocity = random.randint(60, 80)
         hihat.instrument = 9
         hihat.is_drum = True
 
@@ -293,7 +318,8 @@ def generate_section_with_style(generator, primer_sequence, section_name, start_
     # Nastavení nástroje pro každou notu této sekce
     for note in generated_sequence.notes:
         if start_time <= note.start_time < start_time + total_steps * 0.25:
-            note.instrument = instrument
+            note.instrument = instrument # kanál
+            note.program = instrument # patch
 
     return generated_sequence, total_steps * 0.25
 
@@ -647,8 +673,39 @@ def apply_tempo_curve(note_sequence, section_types, base_tempo=120):
         note_sequence.tempos[-1].time = i * section_length
 
 @app.route("/generate_music", methods=["POST"])
-def generate_music(section_types=None):
+def generate_music(section_types=None, parsed_params=None):
     data = request.json
+
+    selected_chords = data.get("chords", [])
+
+    # Mapuj názvy akordů na tóny (pokud je uživatel zvolil)
+    if selected_chords:
+        chord_progression = []
+        for ch in selected_chords:
+            # CHORD_PITCHES obsahuje mapping akordů na seznam MIDI tónů
+            if ch in CHORD_PITCHES:
+                chord_progression.append(CHORD_PITCHES[ch])
+            else:
+                # fallback na C dur, pokud je v seznamu něco neznámého
+                chord_progression.append(CHORD_PITCHES["C"])
+    else:
+        # fallback na výchozí progresi
+        chord_progression = [CHORD_PITCHES[ch] for ch in ["C", "F", "Am", "G"]]
+
+    # 1) Načtu si seznam vybraných nástrojů z UI
+    selected = data.get("instruments", [])
+    try:
+        selected = [int(x) for x in selected]
+    except ValueError:
+        selected = []
+    # 2) Pokud uživatel vybral alespoň jeden nástroj, použijeme ho a přeskočíme žánrové presetování
+    if selected:
+        melody_instrument = selected[0]                # 1. dropdown = melodie
+        bass_instrument   = selected[1] if len(selected) > 1 else None
+        chord_instrument  = selected[2] if len(selected) > 2 else None
+        pad_instrument    = selected[3] if len(selected) > 3 else None
+        add_drums         = (128 in selected)          # bubny mají kód 128
+
     app.logger.info(f"🎹 Received payload: {data}")
     if not data:
         return jsonify({"error": "Nebyla poskytnuta žádná data."}), 400
@@ -692,19 +749,6 @@ def generate_music(section_types=None):
     tempo = parsed_params["tempo"]
     temperature = parsed_params["temperature"]
     model = parsed_params["model"]
-    layers = prepare_layers_for_genre(parsed_params.get("genre") or "pop",
-        melody_instrument=parsed_params["melody_instrument"],
-        pad_instrument=parsed_params["pad_instrument"])
-
-    melody_instrument = layers["melody"]
-    # Pokud je žánr rock, nechceme melodii (vypneme ji nastavením na None)
-    if parsed_params.get("genre") == "rock":
-        melody_instrument = None
-
-    bass_instrument   = layers["bass"]
-    chord_instrument  = layers["chords"]
-    pad_instrument    = layers["pad"]
-    add_drums         = layers["drums"] is not None
 
     chord_progression_type = parsed_params["chord_progression_type"]
     major_key = parsed_params["major_key"]
@@ -750,20 +794,29 @@ def generate_music(section_types=None):
 
     generator.initialize()
 
-    for section_type in section_types:
-        section_length = section_duration
-        generated = generate_section(
+    full_sequence = music_pb2.NoteSequence()
+    start_time = 0.5
+
+    for section in section_types:
+        # tady vygeneruji jednu část + dostanu délku v sekundách
+        generated_part, duration = generate_section_with_style(
             generator=melody_rnn,
             primer_sequence=primer_sequence,
-            total_steps=section_length,
-            temperature=temperature
-            )
+            section_name=section,
+            start_time=start_time
+    )
 
-    for note in generated.notes:
+    # poznámky z té části přidám do finální sekvence
+    for note in generated_part.notes:
         full_sequence.notes.add().CopyFrom(note)
-        start_time += section_length
 
+    # anotace (akordové symboly) už `generate_section_with_style` vložila sama
+    # teď jen posunu startovní čas pro další část:
+    start_time += duration
+
+    # nakonec namapuju tempo atd.
     note_sequence = full_sequence
+
 
     # Výpočet sekcí a jejich typů před aplikací tempa
     section_duration = 8  # délka sekce v sekundách
@@ -789,6 +842,13 @@ def generate_music(section_types=None):
         start_time += duration
         output_sequence.notes.extend(generated_part.notes)
         output_sequence.total_time = start_time
+
+    # Pokud uživatel zadal akordy, použijeme je!
+    if selected_chords:
+        chord_progression = selected_chords
+    else:
+        # fallback na původní nebo defaultní
+        chord_progression = ["C", "F", "Am", "G"]
 
     if chord_style == "seventh":
         chord_progression = [
@@ -868,37 +928,41 @@ def generate_music(section_types=None):
     total_chord_beats = len(chord_progression) * measure_duration
     num_repetitions = int(length / total_chord_beats) + 1
 
-    for rep in range(num_repetitions):
-        for i, chord in enumerate(chord_progression):
-            start = (rep * total_chord_beats) + (i * measure_duration)
+    if chord_instrument is not None:
+        for rep in range(num_repetitions):
+            for i, chord in enumerate(chord_progression):
+                start = (rep * total_chord_beats) + (i * measure_duration)
+                if start >= length:
+                    break
+                end = start + 1.5
+                for pitch in chord:
+                    chord_note = note_sequence.notes.add()
+                    chord_note.pitch = pitch
+                    chord_note.start_time = start
+                    chord_note.end_time = end
+                    chord_note.velocity = 70
+                    chord_note.instrument = 2
+                    if chord_instrument is not None and chord_instrument != 128:
+                        chord_note.program = chord_instrument
+                    chord_note.is_drum = False
             if start >= length:
                 break
-            end = start + 1.5
-            for pitch in chord:
-                chord_note = note_sequence.notes.add()
-                chord_note.pitch = pitch
-                chord_note.start_time = start
-                chord_note.end_time = end
-                chord_note.velocity = 70
-                chord_note.instrument = 2
-                chord_note.program = chord_instrument
-                chord_note.is_drum = False
-        if start >= length:
-            break
+
 
     # Basová linka
-    for i in range(0, length, 2):
-        if i >= length:
-            break
-        bass_note = note_sequence.notes.add()
-        bass_note.pitch = 36
-        bass_note.start_time = i
-        bass_note.end_time = i + 1.5
-        bass_note.velocity = 80
-        bass_note.instrument = 1
-        bass_note.program = bass_instrument
-        bass_note.is_drum = False
-
+    if bass_instrument is not None:
+        for i in range(0, length, 2):
+            if i >= length:
+                break
+            bass_note = note_sequence.notes.add()
+            bass_note.pitch = 36
+            bass_note.start_time = i
+            bass_note.end_time = i + 1.5
+            bass_note.velocity = 100
+            bass_note.instrument = 1
+            if pad_instrument is not None and pad_instrument != 128:
+                note.program = pad_instrument
+            bass_note.is_drum = False
 
     if add_drums:
         for i in range(0, length):
@@ -1041,7 +1105,6 @@ def generate_music(section_types=None):
                     note.program = melody_instrument
 
     safe_title = title.replace(" ", "_") if title else ""
-
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
     if safe_title:
@@ -1053,7 +1116,36 @@ def generate_music(section_types=None):
         midi_filename = f"generated_{model}_{length}s_{tempo}bpm_{timestamp}.mid"
         wav_filename = f"generated_{model}_{length}s_{tempo}bpm_{timestamp}.wav"
 
-    # Cesty k souborům (vždy se provede)
+    # 1) Zde si načti vybrané nástroje
+    selected = data.get("instruments", [])
+    try:
+        selected = [int(x) for x in selected]
+    except ValueError:
+        selected = []
+    # --------------------------------------------
+
+    # … tady máš kompletně vygenerované `note_sequence` …
+
+    # --------------------------------------------
+    # 2) Teď filtruj podle vybraných nástrojů (jen pokud něco vybráno)
+    if selected:
+        filtered = []
+        for n in note_sequence.notes:
+            if n.is_drum:
+                if 128 in selected:
+                    filtered.append(n)
+            else:
+                if n.program in selected:
+                    filtered.append(n)
+        note_sequence.ClearField("notes")
+        note_sequence.notes.extend(filtered)
+    # --------------------------------------------
+
+    app.logger.info(f"💡 Selected instruments: {selected}")
+    app.logger.info(f"💡 Notes before filter: {len(note_sequence.notes)}")
+    app.logger.info(f"💡 Notes after filter: {len(filtered) if selected else 'no filtering'}")
+
+# Cesty k souborům (vždy se provede)
     midi_path = os.path.join(OUTPUT_DIR, midi_filename)
     wav_path = os.path.join(OUTPUT_DIR, wav_filename)
 
@@ -1121,22 +1213,9 @@ def generate_music(section_types=None):
         "wav_file": f"/download_music/{os.path.basename(wav_path)}"
     })
 
-def generate_jazzy_chords(notes, chord, start_time, chord_instrument):
+def generate_jazzy_chords(notes, chord, start_time, chord_instrument, primer_sequence=None, total_steps=None,
+                          generated_sequence=None):
     pass
-
-def generate_section(generator, primer_sequence, total_steps=16, temperature=1.0):
-    from note_seq.protobuf import generator_pb2
-
-    generator_options = generator_pb2.GeneratorOptions()
-    generate_section = generator_options.generate_sections.add()
-    generate_section.start_time = primer_sequence.total_time
-    generate_section.end_time = primer_sequence.total_time + total_steps
-    generator_options.args['temperature'].float_value = temperature
-
-    # Tady je klíčová oprava: zavoláme metodu `generate()` na instanci generátoru
-    generated_sequence = generate_full_song(generator, primer_sequence)
-
-    return generated_sequence
 
     # Spoj původní a novou část
     final_sequence = magenta.music.sequences_lib.concatenate_sequences([primer_sequence, generated_sequence])
