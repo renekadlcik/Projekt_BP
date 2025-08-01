@@ -91,7 +91,6 @@ CHORD_PITCHES = {
     "Am":    [69, 72, 76],
 }
 
-
 REVERSE_INSTRUMENT_MIDI_MAP = {v: k.replace("_", " ").title() for k, v in INSTRUMENT_MIDI_MAP.items()}
 REVERSE_INSTRUMENT_MIDI_MAP[128] = "Drums"
 
@@ -231,8 +230,6 @@ def generate_drums(notes, start):
         hihat.instrument = 9
         hihat.is_drum = True
 
-
-# --- nový blok -----------------------------------------------------------
 def prepare_layers_for_genre(genre_key: str,
                              melody_instrument: int | None = None,
                              pad_instrument: int | None = None):
@@ -271,7 +268,6 @@ def prepare_layers_for_genre(genre_key: str,
         base["pad"] = pad_instrument
 
     return base
-# --- konec nového bloku ---------------------------------------------------
 
 def generate_section_with_style(generator, primer_sequence, section_name, start_time):
     # Defaultní parametry
@@ -692,7 +688,7 @@ def generate_music(section_types=None, parsed_params=None):
         # fallback na výchozí progresi
         chord_progression = [CHORD_PITCHES[ch] for ch in ["C", "F", "Am", "G"]]
 
-    # 1) Načtu si seznam vybraných nástrojů z UI
+    # 1) Načtení seznamu vybraných nástrojů z UI
     selected = data.get("instruments", [])
     try:
         selected = [int(x) for x in selected]
@@ -947,7 +943,6 @@ def generate_music(section_types=None, parsed_params=None):
                     chord_note.is_drum = False
             if start >= length:
                 break
-
 
     # Basová linka
     if bass_instrument is not None:
@@ -1213,8 +1208,7 @@ def generate_music(section_types=None, parsed_params=None):
         "wav_file": f"/download_music/{os.path.basename(wav_path)}"
     })
 
-def generate_jazzy_chords(notes, chord, start_time, chord_instrument, primer_sequence=None, total_steps=None,
-                          generated_sequence=None):
+def generate_jazzy_chords(notes, chord, start_time, chord_instrument, primer_sequence=None, total_steps=None, generated_sequence=None):
     pass
 
     # Spoj původní a novou část
@@ -1240,4 +1234,5 @@ def download_music(filename):
     return send_from_directory(OUTPUT_DIR, filename, as_attachment=True)
 
 if __name__ == "__main__":
-    app.run(debug=True, port=5000)
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)
