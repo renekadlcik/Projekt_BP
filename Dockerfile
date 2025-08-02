@@ -10,6 +10,7 @@ RUN apt-get update && \
         libffi-dev \
         libglib2.0-0 \
         libsmf-dev \
+        libjack-dev \   # <-- přidej tuto řádku\
         pkg-config \
         git \
         fluidsynth \
