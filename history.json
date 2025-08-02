@@ -1,6 +1,26 @@
 [
     {
         "title": "Bez názvu",
+        "timestamp": "20250801_215120",
+        "model": "basic_rnn",
+        "length": 30,
+        "tempo": 120.0,
+        "temperature": 1.0,
+        "genre": "pop",
+        "melody_instrument": 0,
+        "bass_instrument": null,
+        "chord_instrument": null,
+        "pad_instrument": null,
+        "add_drums": false,
+        "chord_progression_type": "standard",
+        "major_key": true,
+        "add_arpeggio": false,
+        "prompt": "",
+        "midi_file": "/download_music/generated_basic_rnn_30s_120.0bpm_20250801_215120.mid",
+        "wav_file": "/download_music/generated_basic_rnn_30s_120.0bpm_20250801_215120.wav"
+    },
+    {
+        "title": "Bez názvu",
         "timestamp": "20250726_195821",
         "model": "basic_rnn",
         "length": 30,
@@ -978,25 +998,5 @@
         "prompt": "",
         "midi_file": "/download_music/generated_basic_rnn_30s_120.0bpm_20250721_201829.mid",
         "wav_file": "/download_music/generated_basic_rnn_30s_120.0bpm_20250721_201829.wav"
-    },
-    {
-        "title": "Bez názvu",
-        "timestamp": "20250721_201803",
-        "model": "basic_rnn",
-        "length": 30,
-        "tempo": 120.0,
-        "temperature": 1.0,
-        "genre": "pop",
-        "melody_instrument": 0,
-        "bass_instrument": 33,
-        "chord_instrument": 27,
-        "pad_instrument": 88,
-        "add_drums": true,
-        "chord_progression_type": "standard",
-        "major_key": true,
-        "add_arpeggio": false,
-        "prompt": "",
-        "midi_file": "/download_music/generated_basic_rnn_30s_120.0bpm_20250721_201803.mid",
-        "wav_file": "/download_music/generated_basic_rnn_30s_120.0bpm_20250721_201803.wav"
     }
 ]
